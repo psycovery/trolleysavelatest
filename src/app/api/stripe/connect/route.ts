@@ -3,7 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createConnectAccount, createOnboardingLink } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
 
-// POST /api/stripe/connect — create or re-onboard a seller's Stripe Connect account
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -11,23 +12,23 @@ export async function POST(request: Request) {
 
   const origin = process.env.NEXT_PUBLIC_APP_URL!
 
-  // Fetch seller profile
   const { data: profile } = await supabase
     .from('profiles')
-    .select('stripe_account_id, stripe_verified')
+    .select('stripe_account_id, stripe_verified, full_name')
     .eq('id', user.id)
     .single()
 
   let accountId = profile?.stripe_account_id
 
-  // Create account if not yet started
   if (!accountId) {
-    const account = await createConnectAccount(user.email!)
+    const account = await createConnectAccount(user.email!, profile?.full_name)
     accountId = account.id
-    await supabase.from('profiles').update({ stripe_account_id: accountId }).eq('id', user.id)
+    await supabase
+      .from('profiles')
+      .update({ stripe_account_id: accountId })
+      .eq('id', user.id)
   }
 
-  // Generate onboarding link
   const link = await createOnboardingLink(accountId, origin)
   return NextResponse.json({ url: link.url })
 }
