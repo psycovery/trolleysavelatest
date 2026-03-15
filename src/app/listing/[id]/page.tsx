@@ -31,7 +31,7 @@ export default function ListingDetailPage() {
       // Use maybeSingle() instead of single() — won't throw if not found
       const { data, error } = await supabase
         .from('listings')
-        .select('*, seller:profiles(id,full_name,rating,sales_count,postcode,created_at)')
+        .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,rating,sales_count,postcode,created_at)')
         .eq('id', id)
         .maybeSingle()
 
@@ -44,7 +44,7 @@ export default function ListingDetailPage() {
       if (!data) {
         const { data: ownListing } = await supabase
           .from('listings')
-          .select('*, seller:profiles(id,full_name,rating,sales_count,postcode,created_at)')
+          .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,rating,sales_count,postcode,created_at)')
           .eq('id', id)
           .maybeSingle()
         setListing(ownListing as Listing)
