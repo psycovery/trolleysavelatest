@@ -49,7 +49,7 @@ export function OfferModal({ listing, onClose }: Props) {
       const res = await fetch('/api/offers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listing_id: listing.id, amount }),
+        body: JSON.stringify({ listing_id: listing!.id, amount }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
