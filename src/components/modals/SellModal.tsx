@@ -235,7 +235,7 @@ export function SellModal({ open, onClose }: Props) {
         </div>
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="btn btn-outline flex-1 justify-center py-3">Cancel</button>
+          <button onClick={() => onClose()} className="btn btn-outline flex-1 justify-center py-3">Cancel</button>
           <button onClick={submit} disabled={loading} className="btn btn-primary flex-1 justify-center py-3 font-semibold">
             {loading ? <Spinner size={18} className="text-white" /> :
               sponsored ? '⚡ List + Sponsor — £1.50/wk' :
