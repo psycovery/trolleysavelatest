@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     brand: brand?.trim() || null,
     barcode: barcode?.trim() || null,
     quantity: parseInt(quantity) || 1,
-    best_before: best_before.length === 7 ? `${best_before}-01` : best_before,
+best_before: String(best_before).slice(0, 7) + '-01',
     asking_price: is_donation ? null : parseFloat(asking_price),
     is_donation: !!is_donation,
     category,
