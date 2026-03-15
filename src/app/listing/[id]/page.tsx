@@ -10,7 +10,7 @@ import { ClaimModal } from '@/components/modals/ClaimModal'
 import { Toast, showToast, Spinner, StarRating, Badge, TinPlaceholder } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { formatPounds, formatBestBefore } from '@/lib/utils'
-import type { Listing } from '@/types'
+import type { Listing, BundleItem } from '@/types'
 import { ArrowLeft, MessageCircle } from 'lucide-react'
 
 export default function ListingDetailPage() {
@@ -20,6 +20,7 @@ export default function ListingDetailPage() {
   const supabase = createClient()
 
   const [listing, setListing]     = useState<Listing | null>(null)
+  const [bundleItems, setBundleItems] = useState<BundleItem[]>([])
   const [loading, setLoading]     = useState(true)
   const [offerOpen, setOfferOpen] = useState(false)
   const [claimOpen, setClaimOpen] = useState(false)
@@ -53,6 +54,16 @@ export default function ListingDetailPage() {
       }
 
       setLoading(false)
+
+      // Fetch bundle items if this is a bundle listing
+      if (data?.is_bundle) {
+        const { data: items } = await supabase
+          .from('bundle_items')
+          .select('*')
+          .eq('listing_id', id)
+          .order('created_at')
+        setBundleItems(items ?? [])
+      }
 
       if (data) {
         supabase.from('listings')
@@ -207,6 +218,34 @@ export default function ListingDetailPage() {
                 </div>
               ))}
             </div>
+
+            {/* Bundle contents */}
+            {(listing as any).is_bundle && bundleItems.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-[14px] p-4 mb-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">📦</span>
+                  <p className="font-semibold text-sm text-amber-800">Bundle contents — {bundleItems.length} tin types</p>
+                </div>
+                <div className="space-y-2">
+                  {bundleItems.map((item, i) => (
+                    <div key={item.id} className="bg-white rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{item.title}</p>
+                        {item.brand && <p className="text-xs text-gray-400">{item.brand}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 text-xs text-gray-500">
+                        {item.weight_grams && <span className="font-medium">{item.weight_grams}g</span>}
+                        {item.best_before && <span>BB: {new Date(item.best_before).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>}
+                        <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">×{item.quantity}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-amber-700 mt-3 flex items-center gap-1">
+                  <span>⚠️</span> All tins sold together — cannot be split or sold separately
+                </p>
+              </div>
+            )}
 
             {listing.allergens && (
               <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">

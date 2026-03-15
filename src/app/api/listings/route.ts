@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     title, quantity, best_before, asking_price, is_donation,
     category, delivery_method, postcode, is_sponsored,
     allergens, description, barcode, brand, weight_grams, expires_at,
+    is_bundle, bundle_items,
   } = body
 
   // Validation
@@ -76,9 +77,26 @@ export async function POST(request: Request) {
     description:    description?.trim() || null,
     weight_grams:   weight_grams ? parseInt(weight_grams) : null,
     expires_at:     expires_at || null,
+    is_bundle:      !!is_bundle,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Insert bundle items if this is a bundle listing
+  if (is_bundle && Array.isArray(bundle_items) && bundle_items.length > 0 && data?.id) {
+    const items = bundle_items.map((item: any) => ({
+      listing_id:   data.id,
+      title:        item.title?.trim(),
+      brand:        item.brand?.trim() || null,
+      quantity:     parseInt(item.quantity) || 1,
+      weight_grams: item.weight_grams ? parseInt(item.weight_grams) : null,
+      best_before:  item.best_before ? String(item.best_before).slice(0, 7) + '-01' : null,
+    })).filter((item: any) => item.title)
+
+    if (items.length > 0) {
+      await supabase.from('bundle_items').insert(items)
+    }
+  }
 
   // Trigger wishlist matching (fire and forget)
   fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/match-wishlists`, {
