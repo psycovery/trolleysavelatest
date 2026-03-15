@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL!
+const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'https://trolleysave98.vercel.app'
 
   const { data: profile } = await supabase
     .from('profiles')
