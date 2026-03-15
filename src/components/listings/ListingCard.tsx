@@ -86,7 +86,7 @@ export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false
             <div className="flex items-center gap-1 mb-2">
               <StarRating rating={listing.seller.rating ?? 0} />
               <span className="text-xs text-gray-500">
-                {listing.seller.rating?.toFixed(1)} · {listing.seller.full_name.split(' ')[0]}
+                {listing.seller.rating?.toFixed(1)} · {(listing.seller as any).nickname || listing.seller.full_name.split(' ')[0]}
               </span>
             </div>
           )}
