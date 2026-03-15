@@ -17,7 +17,7 @@ const CATEGORIES = [
   { label: 'Condiments', value: 'condiments' },
 ]
 
-interface Props { open: boolean; onClose: () => void }
+interface Props { open: boolean; onClose: (created?: boolean) => void }
 
 export function SellModal({ open, onClose }: Props) {
   const [type, setType]             = useState<'sell' | 'donate'>('sell')
@@ -74,7 +74,7 @@ export function SellModal({ open, onClose }: Props) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      onClose()
+      onClose(true)
       if (isDonate) showToast('💚 Donation listing published! First to claim gets it.')
       else if (sponsored) showToast('⚡ Listing published & sponsored for £1.50/wk!')
       else showToast('🎉 Listing published for free!')
