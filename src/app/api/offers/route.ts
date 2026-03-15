@@ -7,7 +7,7 @@ import { poundsToPence } from '@/lib/utils'
 
 // POST /api/offers — buyer creates an offer
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
