@@ -21,9 +21,10 @@ export function penceToPounds(pence: number): number {
   return pence / 100
 }
 
-/** 1.5% platform fee, returned in pounds */
+/** Platform fee: 1.5% with minimum 25p, returned in pounds */
 export function calcSellerFee(price: number): number {
-  return parseFloat((price * 0.015).toFixed(2))
+  const pct = price * 0.015
+  return parseFloat(Math.max(0.25, pct).toFixed(2))
 }
 
 /** 0.5% donation fee, minimum £1.00, returned in pounds */

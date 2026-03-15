@@ -97,10 +97,16 @@ export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false
             </p>
           )}
 
-          <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+          <div className="flex items-center gap-1 text-xs text-gray-400 mb-2 flex-wrap">
             <span>{listing.postcode}</span>
             <span>·</span>
             <span>BB: {formatBestBefore(listing.best_before)}</span>
+            {(listing as any).weight_grams && (
+              <>
+                <span>·</span>
+                <span className="font-medium text-gray-500">{(listing as any).weight_grams}g</span>
+              </>
+            )}
           </div>
 
           {listing.seller && (
