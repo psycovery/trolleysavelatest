@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 
 // GET /api/listings — fetch listings with filters
 export async function GET(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { searchParams } = new URL(request.url)
 
   const category     = searchParams.get('category')
