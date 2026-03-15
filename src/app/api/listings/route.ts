@@ -40,6 +40,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const body = await request.json()
+console.log('DATE RECEIVED:', body.best_before, typeof body.best_before)
   const {
     title, quantity, best_before, asking_price, is_donation,
     category, delivery_method, postcode, is_sponsored,
