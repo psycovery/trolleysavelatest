@@ -1,5 +1,5 @@
-// src/app/layout.tsx
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import '@/styles/globals.css'
 
 export const metadata: Metadata = {
@@ -20,7 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-GB">
       <body className="font-body bg-gray-50 text-gray-900 min-h-screen flex flex-col">
-        {children}
+        <Suspense fallback={null}>
+          {children}
+        </Suspense>
       </body>
     </html>
   )
