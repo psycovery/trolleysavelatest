@@ -1,13 +1,13 @@
 'use client'
 // src/app/buyer/page.tsx
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { OfferModal } from '@/components/modals/OfferModal'
-import { Toast, showToast, Spinner, StarRating, Badge, SectionHeader } from '@/components/ui'
+import { Toast, showToast, Spinner, Badge, SectionHeader } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { formatPounds, formatDate, formatBestBefore, calcDonationFee } from '@/lib/utils'
+import { formatPounds, formatDate, formatBestBefore } from '@/lib/utils'
 import type { Listing, Offer, WishlistItem, WishlistMatch, Transaction } from '@/types'
 import { cn } from '@/lib/utils'
 import { Plus, X } from 'lucide-react'
@@ -16,32 +16,40 @@ type Tab = 'saved' | 'wishlist' | 'offers' | 'history'
 
 export default function BuyerPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const supabase = createClient()
 
-  const [tab, setTab]                 = useState<Tab>((searchParams.get('tab') as Tab) ?? 'saved')
-  const [user, setUser]               = useState<any>(null)
-  const [profile, setProfile]         = useState<any>(null)
-  const [saved, setSaved]             = useState<Listing[]>([])
-  const [wishlist, setWishlist]       = useState<WishlistItem[]>([])
-  const [matches, setMatches]         = useState<WishlistMatch[]>([])
-  const [offers, setOffers]           = useState<Offer[]>([])
-  const [history, setHistory]         = useState<Transaction[]>([])
-  const [unseenCount, setUnseenCount] = useState(0)
-  const [loading, setLoading]         = useState(true)
+  const [tab, setTab]                   = useState<Tab>('saved')
+  const [user, setUser]                 = useState<any>(null)
+  const [profile, setProfile]           = useState<any>(null)
+  const [saved, setSaved]               = useState<Listing[]>([])
+  const [wishlist, setWishlist]         = useState<WishlistItem[]>([])
+  const [matches, setMatches]           = useState<WishlistMatch[]>([])
+  const [offers, setOffers]             = useState<Offer[]>([])
+  const [history, setHistory]           = useState<Transaction[]>([])
+  const [unseenCount, setUnseenCount]   = useState(0)
+  const [loading, setLoading]           = useState(true)
   const [offerListing, setOfferListing] = useState<Listing | null>(null)
 
   // Wishlist modal state
   const [wishlistOpen, setWishlistOpen]           = useState(false)
   const [wishlistProduct, setWishlistProduct]     = useState('')
-  const [wishlistMatchType, setWishlistMatchType] = useState<'exact'|'brand'|'category'>('exact')
+  const [wishlistMatchType, setWishlistMatchType] = useState<'exact' | 'brand' | 'category'>('exact')
 
   // Review modal state
-  const [reviewOpen, setReviewOpen]       = useState(false)
+  const [reviewOpen, setReviewOpen]             = useState(false)
   const [reviewTransaction, setReviewTransaction] = useState<Transaction | null>(null)
-  const [reviewStars, setReviewStars]     = useState(0)
-  const [reviewText, setReviewText]       = useState('')
-  const [reviewLoading, setReviewLoading] = useState(false)
+  const [reviewStars, setReviewStars]           = useState(0)
+  const [reviewText, setReviewText]             = useState('')
+  const [reviewLoading, setReviewLoading]       = useState(false)
+
+  useEffect(() => {
+    // Read tab from URL without useSearchParams
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const t = params.get('tab') as Tab
+      if (t) setTab(t)
+    }
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -51,15 +59,23 @@ export default function BuyerPage() {
 
       const [{ data: p }, { data: s }, { data: w }, { data: m }, { data: o }, { data: h }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', u.id).single(),
-        supabase.from('saved_listings').select('listing:listings(*, seller:profiles(full_name,rating,postcode))')
-          .eq('user_id', u.id).order('created_at', { ascending: false }),
+        supabase.from('saved_listings')
+          .select('listing:listings(*, seller:profiles(full_name,rating,postcode))')
+          .eq('user_id', u.id)
+          .order('created_at', { ascending: false }),
         supabase.from('wishlists').select('*').eq('buyer_id', u.id).order('created_at', { ascending: false }),
-        supabase.from('wishlist_matches').select('*, listing:listings(*, seller:profiles(full_name,rating,postcode)), wishlist:wishlists(product_name,match_type)')
-          .eq('buyer_id', u.id).order('notified_at', { ascending: false }),
-        supabase.from('offers').select('*, listing:listings(*, seller:profiles(full_name,rating,postcode))')
-          .eq('buyer_id', u.id).order('created_at', { ascending: false }),
-        supabase.from('transactions').select('*, seller:profiles(full_name)')
-          .eq('buyer_id', u.id).order('created_at', { ascending: false }),
+        supabase.from('wishlist_matches')
+          .select('*, listing:listings(*, seller:profiles(full_name,rating,postcode)), wishlist:wishlists(product_name,match_type)')
+          .eq('buyer_id', u.id)
+          .order('notified_at', { ascending: false }),
+        supabase.from('offers')
+          .select('*, listing:listings(*, seller:profiles(full_name,rating,postcode))')
+          .eq('buyer_id', u.id)
+          .order('created_at', { ascending: false }),
+        supabase.from('transactions')
+          .select('*, seller:profiles(full_name)')
+          .eq('buyer_id', u.id)
+          .order('created_at', { ascending: false }),
       ])
 
       setProfile(p)
@@ -74,7 +90,6 @@ export default function BuyerPage() {
     load()
   }, [])
 
-  // Mark matches as seen when viewing wishlist tab
   useEffect(() => {
     if (tab === 'wishlist' && unseenCount > 0 && user) {
       supabase.from('wishlist_matches').update({ seen: true }).eq('buyer_id', user.id).eq('seen', false)
@@ -95,7 +110,7 @@ export default function BuyerPage() {
   }
 
   async function addWishlistItem() {
-    if (!wishlistProduct.trim()) { showToast('⚠️ Enter what you\'re looking for'); return }
+    if (!wishlistProduct.trim()) { showToast("⚠️ Enter what you're looking for"); return }
     const { data, error } = await supabase.from('wishlists').insert({
       buyer_id: user.id,
       product_name: wishlistProduct.trim(),
@@ -106,7 +121,7 @@ export default function BuyerPage() {
     setWishlist(prev => [data, ...prev])
     setWishlistOpen(false)
     setWishlistProduct('')
-    showToast('🎯 Added to wishlist — we\'ll notify you when a match appears')
+    showToast("🎯 Added to wishlist — we'll notify you when a match appears")
   }
 
   async function submitReview() {
@@ -117,7 +132,6 @@ export default function BuyerPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         seller_id: reviewTransaction.seller_id,
-        listing_id: null, // attach via transaction
         transaction_id: reviewTransaction.id,
         rating: reviewStars,
         review_text: reviewText.trim() || null,
@@ -127,7 +141,8 @@ export default function BuyerPage() {
     setReviewLoading(false)
     if (!res.ok) { showToast(`❌ ${data.error}`); return }
     setReviewOpen(false)
-    setReviewStars(0); setReviewText('')
+    setReviewStars(0)
+    setReviewText('')
     showToast('⭐ Review submitted — thank you!')
   }
 
@@ -164,7 +179,8 @@ export default function BuyerPage() {
             { id: 'history',  label: '📦 History' },
           ] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={cn('flex-1 py-2 px-1 rounded-[10px] text-xs font-semibold transition-all relative',
+              className={cn(
+                'flex-1 py-2 px-1 rounded-[10px] text-xs font-semibold transition-all relative',
                 tab === t.id ? 'bg-green-600 text-white' : 'text-gray-500 hover:text-gray-700'
               )}>
               {t.label}
@@ -175,7 +191,7 @@ export default function BuyerPage() {
           ))}
         </div>
 
-        {/* Saved tab */}
+        {/* SAVED TAB */}
         {tab === 'saved' && (
           <div>
             <SectionHeader title="Saved items" subtitle={`${saved.length} items`} />
@@ -203,7 +219,8 @@ export default function BuyerPage() {
                       <p className="font-semibold text-xs truncate mb-1">{l.title}</p>
                       <div className="flex justify-between items-center">
                         <p className="font-display font-bold text-green-700">{formatPounds(l.asking_price ?? 0)}</p>
-                        <button onClick={() => setOfferListing(l)} className="btn btn-sm btn-amber text-[10px] px-2 py-1">Offer</button>
+                        <button onClick={() => setOfferListing(l)}
+                          className="btn btn-sm btn-amber text-[10px] px-2 py-1">Offer</button>
                       </div>
                     </div>
                   </div>
@@ -213,14 +230,16 @@ export default function BuyerPage() {
           </div>
         )}
 
-        {/* Wishlist tab */}
+        {/* WISHLIST TAB */}
         {tab === 'wishlist' && (
           <div>
             {unseenCount > 0 && (
               <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-[14px] p-4 mb-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl flex-shrink-0">🔔</div>
                 <div className="flex-1">
-                  <p className="font-bold text-sm text-white">{unseenCount} wishlist {unseenCount === 1 ? 'match' : 'matches'} found!</p>
+                  <p className="font-bold text-sm text-white">
+                    {unseenCount} wishlist {unseenCount === 1 ? 'match' : 'matches'} found!
+                  </p>
                   <p className="text-xs text-white/80">Sellers have listed tins you're looking for.</p>
                 </div>
               </div>
@@ -250,9 +269,6 @@ export default function BuyerPage() {
                         <div className="text-2xl">🥫</div>
                         <div className="flex-1">
                           <p className="font-semibold text-sm">{w.product_name}</p>
-                          <p className="text-xs text-gray-500">
-                            {w.match_type === 'exact' ? 'Exact product' : w.match_type === 'brand' ? 'Brand match' : 'Category match'}
-                          </p>
                           <Badge variant={w.match_type === 'exact' ? 'green' : w.match_type === 'brand' ? 'amber' : 'gray'} className="mt-1">
                             {w.match_type === 'exact' ? 'Exact match' : w.match_type === 'brand' ? 'Brand match' : 'Category match'}
                           </Badge>
@@ -262,11 +278,13 @@ export default function BuyerPage() {
                         </button>
                       </div>
                       {hasMatch ? itemMatches.map(m => (
-                        <div key={m.id} className="px-3 pb-3 bg-green-50 border-t border-green-100 flex items-center gap-3">
+                        <div key={m.id} className="px-3 pb-3 bg-green-50 border-t border-green-100 flex items-center gap-3 pt-2">
                           <div className="text-xl">🎯</div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-bold text-green-700">Match found · {(m.listing as any)?.seller?.full_name}</p>
-                            <p className="text-xs text-gray-500 truncate">{(m.listing as any)?.title} · BB {formatBestBefore((m.listing as any)?.best_before ?? '')}</p>
+                            <p className="text-xs font-bold text-green-700">Match · {(m.listing as any)?.seller?.full_name}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {(m.listing as any)?.title} · BB {formatBestBefore((m.listing as any)?.best_before ?? '')}
+                            </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <p className="font-display font-bold text-green-700">{formatPounds((m.listing as any)?.asking_price ?? 0)}</p>
@@ -286,7 +304,7 @@ export default function BuyerPage() {
           </div>
         )}
 
-        {/* Offers tab */}
+        {/* OFFERS TAB */}
         {tab === 'offers' && (
           <div>
             <SectionHeader title="My offers" />
@@ -302,7 +320,7 @@ export default function BuyerPage() {
                   <div key={o.id} className="bg-white border border-amber-200 rounded-[14px] p-4 flex items-center gap-4 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{(o.listing as any)?.title}</p>
-                      <p className="text-xs text-gray-400">Sent {formatDate(o.created_at)} · {(o.listing as any)?.seller?.full_name}</p>
+                      <p className="text-xs text-gray-400">Sent {formatDate(o.created_at)}</p>
                     </div>
                     <Badge variant={o.status === 'pending' ? 'amber' : o.status === 'accepted' ? 'green' : 'red'}>
                       {o.status === 'pending' ? '⏳ Awaiting seller' : o.status === 'accepted' ? '✓ Accepted' : '✗ Declined'}
@@ -315,7 +333,7 @@ export default function BuyerPage() {
           </div>
         )}
 
-        {/* History tab */}
+        {/* HISTORY TAB */}
         {tab === 'history' && (
           <div>
             <SectionHeader title="Purchase history" />
@@ -334,12 +352,8 @@ export default function BuyerPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <p className="font-display font-bold text-green-700">{formatPounds(t.gross_amount)}</p>
-                      <button
-                        onClick={() => { setReviewTransaction(t); setReviewOpen(true) }}
-                        className="btn btn-sm btn-amber"
-                      >
-                        ⭐ Review
-                      </button>
+                      <button onClick={() => { setReviewTransaction(t); setReviewOpen(true) }}
+                        className="btn btn-sm btn-amber">⭐ Review</button>
                     </div>
                   </div>
                 ))}
@@ -347,14 +361,14 @@ export default function BuyerPage() {
             )}
           </div>
         )}
-      </main>
 
+      </main>
       <Footer />
 
       {/* Offer modal */}
       <OfferModal listing={offerListing} onClose={() => setOfferListing(null)} />
 
-      {/* Wishlist add modal */}
+      {/* Wishlist modal */}
       {wishlistOpen && (
         <div className="modal-overlay open" onClick={e => e.target === e.currentTarget && setWishlistOpen(false)}>
           <div className="modal">
