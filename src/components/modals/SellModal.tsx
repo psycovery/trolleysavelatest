@@ -1,10 +1,13 @@
 'use client'
 // src/components/modals/SellModal.tsx
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import Image from 'next/image'
 import { calcSellerFee, calcSellerPayout, calcDonationFee, formatPounds } from '@/lib/utils'
 import { Spinner } from '@/components/ui'
 import { showToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import { Camera, X } from 'lucide-react'
 
 const CATEGORIES = [
   { label: 'Beans & pulses', value: 'beans' },
@@ -17,9 +20,14 @@ const CATEGORIES = [
   { label: 'Condiments', value: 'condiments' },
 ]
 
+const COMMON_WEIGHTS = [200, 300, 400, 410, 425, 500, 560, 800]
+
 interface Props { open: boolean; onClose: (created?: boolean) => void }
 
 export function SellModal({ open, onClose }: Props) {
+  const supabase = createClient()
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
   const [type, setType]             = useState<'sell' | 'donate'>('sell')
   const [title, setTitle]           = useState('')
   const [quantity, setQuantity]     = useState('1')
@@ -28,15 +36,60 @@ export function SellModal({ open, onClose }: Props) {
   const [postcode, setPostcode]     = useState('')
   const [category, setCategory]     = useState('')
   const [delivery, setDelivery]     = useState('both')
-  const [conditionOk, setConditionOk] = useState(false)
+  const [weightGrams, setWeightGrams] = useState('')
   const [expiresAt, setExpiresAt]   = useState('')
+  const [conditionOk, setConditionOk] = useState(false)
   const [sponsored, setSponsored]   = useState(false)
   const [loading, setLoading]       = useState(false)
+
+  // Image state
+  const [imageFile, setImageFile]     = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   const priceNum = parseFloat(price) || 0
   const isDonate = type === 'donate'
   const fee      = isDonate ? calcDonationFee(priceNum) : calcSellerFee(priceNum)
   const payout   = isDonate ? 0 : calcSellerPayout(priceNum)
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('⚠️ Image must be under 5MB')
+      return
+    }
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onload = (ev) => setImagePreview(ev.target?.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  function removeImage() {
+    setImageFile(null)
+    setImagePreview(null)
+    if (imageInputRef.current) imageInputRef.current.value = ''
+  }
+
+  async function uploadImage(userId: string, listingId: string): Promise<string | null> {
+    if (!imageFile) return null
+    setUploadingImage(true)
+    const ext = imageFile.name.split('.').pop()
+    const path = `${userId}/${listingId}.${ext}`
+    const { error } = await supabase.storage
+      .from('listing-images')
+      .upload(path, imageFile, { upsert: true })
+    if (error) {
+      showToast(`⚠️ Image upload failed: ${error.message}`)
+      setUploadingImage(false)
+      return null
+    }
+    const { data: { publicUrl } } = supabase.storage
+      .from('listing-images')
+      .getPublicUrl(path)
+    setUploadingImage(false)
+    return publicUrl
+  }
 
   async function submit() {
     if (!title.trim())    { showToast('⚠️ Enter a product name'); return }
@@ -46,14 +99,7 @@ export function SellModal({ open, onClose }: Props) {
     if (!category)        { showToast('⚠️ Choose a category'); return }
     if (!conditionOk)     { showToast('⚠️ Please confirm the condition'); return }
 
-    // Ensure date is always in YYYY-MM-DD format
-    let dateStr = bestBefore
-    if (dateStr.length === 7) {
-      dateStr = dateStr + '-01'
-    } else if (dateStr.length < 7) {
-      showToast('⚠️ Please enter a valid best before date')
-      return
-    }
+    const dateStr = bestBefore.length === 7 ? bestBefore + '-01' : bestBefore
 
     setLoading(true)
     try {
@@ -70,11 +116,25 @@ export function SellModal({ open, onClose }: Props) {
           delivery_method: delivery,
           postcode: postcode.trim().toUpperCase(),
           is_sponsored: sponsored,
+          weight_grams: weightGrams ? parseInt(weightGrams) : null,
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+
+      // Upload image if selected
+      if (imageFile && data.data?.id) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const imageUrl = await uploadImage(user.id, data.data.id)
+          if (imageUrl) {
+            await supabase.from('listings')
+              .update({ image_url: imageUrl })
+              .eq('id', data.data.id)
+          }
+        }
+      }
 
       onClose(true)
       if (isDonate) showToast('💚 Donation listing published! First to claim gets it.')
@@ -83,8 +143,9 @@ export function SellModal({ open, onClose }: Props) {
 
       // Reset form
       setTitle(''); setQuantity('1'); setBestBefore(''); setPrice('')
-      setPostcode(''); setCategory(''); setConditionOk(false); setSponsored(false); setExpiresAt('')
-      setType('sell')
+      setPostcode(''); setCategory(''); setConditionOk(false); setSponsored(false)
+      setWeightGrams(''); setExpiresAt(''); setType('sell')
+      removeImage()
     } catch (err: any) {
       showToast(`❌ ${err.message}`)
     } finally {
@@ -116,7 +177,7 @@ export function SellModal({ open, onClose }: Props) {
             <span className="text-base flex-shrink-0">🎯</span>
             <div>
               <p className="text-xs font-bold text-green-700 mb-0.5">Buyers are waiting</p>
-              <p className="text-xs text-gray-500">We take just <strong>1.5%</strong> when it sells. 40+ buyers have active wishlists.</p>
+              <p className="text-xs text-gray-500">We take just <strong>1.5%</strong> when it sells.</p>
             </div>
           </div>
         ) : (
@@ -124,10 +185,41 @@ export function SellModal({ open, onClose }: Props) {
             <span className="text-base flex-shrink-0">💚</span>
             <div>
               <p className="text-xs font-bold text-green-700 mb-0.5">Making a difference</p>
-              <p className="text-xs text-gray-500">Buyer pays <strong>0.5% fee (min £1)</strong> on listed value. You receive £0.00. First to claim gets it.</p>
+              <p className="text-xs text-gray-500">Buyer pays <strong>0.5% fee (min £1)</strong>. First to claim gets it.</p>
             </div>
           </div>
         )}
+
+        {/* Image upload */}
+        <div className="mb-4">
+          <label className="label">Photo <span className="normal-case font-normal tracking-normal text-gray-400">— optional but recommended</span></label>
+          {imagePreview ? (
+            <div className="relative w-full h-40 rounded-[10px] overflow-hidden bg-gray-50 border border-gray-100">
+              <Image src={imagePreview} alt="Preview" fill className="object-cover" />
+              <button
+                onClick={removeImage}
+                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => imageInputRef.current?.click()}
+              className="w-full h-24 border-2 border-dashed border-gray-200 rounded-[10px] flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-green-400 hover:text-green-600 transition-colors"
+            >
+              <Camera className="w-6 h-6" />
+              <span className="text-xs font-medium">Tap to add photo · JPG, PNG, WebP · Max 5MB</span>
+            </button>
+          )}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleImageSelect}
+          />
+        </div>
 
         {/* Form fields */}
         <div className="space-y-3 mb-4">
@@ -157,7 +249,7 @@ export function SellModal({ open, onClose }: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{isDonate ? 'Listed value (£) — waived to buyer' : 'Asking price (£)'}</label>
+              <label className="label">{isDonate ? 'Listed value (£)' : 'Asking price (£)'}</label>
               <input type="number" value={price} onChange={e => setPrice(e.target.value)}
                 step="0.10" min="0.10" className="input" placeholder="0.00" />
             </div>
@@ -165,6 +257,41 @@ export function SellModal({ open, onClose }: Props) {
               <label className="label">Your postcode</label>
               <input value={postcode} onChange={e => setPostcode(e.target.value.toUpperCase())}
                 className="input" placeholder="ST1 4AB" maxLength={8} />
+            </div>
+          </div>
+
+          {/* Weight field */}
+          <div>
+            <label className="label">Weight <span className="normal-case font-normal tracking-normal text-gray-400">— optional</span></label>
+            <div className="flex gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[120px]">
+                <input
+                  type="number"
+                  value={weightGrams}
+                  onChange={e => setWeightGrams(e.target.value)}
+                  className="input pr-10"
+                  placeholder="e.g. 400"
+                  min="1"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">g</span>
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                {COMMON_WEIGHTS.map(w => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => setWeightGrams(String(w))}
+                    className={cn(
+                      'px-2 py-1 rounded-md text-xs font-medium border transition-colors',
+                      weightGrams === String(w)
+                        ? 'border-green-600 bg-green-50 text-green-700'
+                        : 'border-gray-100 text-gray-500 hover:border-green-400'
+                    )}
+                  >
+                    {w}g
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -186,7 +313,7 @@ export function SellModal({ open, onClose }: Props) {
             </div>
           </div>
 
-          {/* Optional listing expiry */}
+          {/* Optional expiry */}
           <div>
             <label className="label">
               Listing expires <span className="normal-case font-normal tracking-normal text-gray-400">— optional</span>
@@ -197,7 +324,6 @@ export function SellModal({ open, onClose }: Props) {
               onChange={e => setExpiresAt(e.target.value)}
               className="input"
               min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
-              placeholder="Leave blank to keep active indefinitely"
             />
             <p className="text-xs text-gray-400 mt-1">Leave blank to keep listed until sold</p>
           </div>
@@ -245,7 +371,6 @@ export function SellModal({ open, onClose }: Props) {
                 <div className="px-3 pb-3 bg-amber-50 border-t border-amber-100 pt-2 text-xs text-amber-700 space-y-1">
                   <p>⚡ Pinned to top of search for 7 days</p>
                   <p>🏷️ Bold Sponsored badge on your listing</p>
-                  <p className="text-amber-600 opacity-70">Renews automatically each week unless cancelled.</p>
                 </div>
               )}
             </div>
@@ -254,8 +379,8 @@ export function SellModal({ open, onClose }: Props) {
 
         <div className="flex gap-2">
           <button onClick={() => onClose()} className="btn btn-outline flex-1 justify-center py-3">Cancel</button>
-          <button onClick={submit} disabled={loading} className="btn btn-primary flex-1 justify-center py-3 font-semibold">
-            {loading ? <Spinner size={18} className="text-white" /> :
+          <button onClick={submit} disabled={loading || uploadingImage} className="btn btn-primary flex-1 justify-center py-3 font-semibold">
+            {loading || uploadingImage ? <Spinner size={18} className="text-white" /> :
               sponsored ? '⚡ List + Sponsor — £1.50/wk' :
               isDonate ? '🆓 Donate for free' : 'List for free'}
           </button>

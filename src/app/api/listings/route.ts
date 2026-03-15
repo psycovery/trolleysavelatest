@@ -2,21 +2,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/listings — fetch listings with filters
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { searchParams } = new URL(request.url)
 
-  const category     = searchParams.get('category')
-  const search       = searchParams.get('q')
-  const isDonation   = searchParams.get('donation') === 'true'
-  const sortField    = searchParams.get('sort') ?? 'created_at'
-  const sortDir      = searchParams.get('dir') ?? 'desc'
-  const limit        = parseInt(searchParams.get('limit') ?? '48')
+  const category   = searchParams.get('category')
+  const search     = searchParams.get('q')
+  const isDonation = searchParams.get('donation') === 'true'
+  const sortField  = searchParams.get('sort') ?? 'created_at'
+  const sortDir    = searchParams.get('dir') ?? 'desc'
+  const limit      = parseInt(searchParams.get('limit') ?? '48')
 
   let query = supabase
     .from('listings')
-    .select('*, seller:profiles(id,full_name,rating,sales_count,postcode)')
+    .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,nickname,avatar_url,rating,sales_count,postcode)')
     .eq('status', 'active')
     .order(sortField, { ascending: sortDir === 'asc' })
     .limit(limit)
@@ -40,47 +42,50 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const body = await request.json()
-console.log('DATE RECEIVED:', body.best_before, typeof body.best_before)
   const {
     title, quantity, best_before, asking_price, is_donation,
     category, delivery_method, postcode, is_sponsored,
-    allergens, description, barcode, brand,
+    allergens, description, barcode, brand, weight_grams, expires_at,
   } = body
 
-  // Basic validation
-  if (!title?.trim())   return NextResponse.json({ error: 'Title is required' }, { status: 400 })
-  if (!best_before)     return NextResponse.json({ error: 'Best before date is required' }, { status: 400 })
-  if (!category)        return NextResponse.json({ error: 'Category is required' }, { status: 400 })
+  // Validation
+  if (!title?.trim())    return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+  if (!best_before)      return NextResponse.json({ error: 'Best before date is required' }, { status: 400 })
+  if (!category)         return NextResponse.json({ error: 'Category is required' }, { status: 400 })
   if (!postcode?.trim()) return NextResponse.json({ error: 'Postcode is required' }, { status: 400 })
   if (!is_donation && (!asking_price || asking_price <= 0))
     return NextResponse.json({ error: 'Asking price required for non-donation listings' }, { status: 400 })
 
+  const dateStr = String(best_before).slice(0, 7) + '-01'
+
   const { data, error } = await supabase.from('listings').insert({
-    seller_id: user.id,
-    title: title.trim(),
-    brand: brand?.trim() || null,
-    barcode: barcode?.trim() || null,
-    quantity: parseInt(quantity) || 1,
-best_before: (String(best_before).substring(0, 7)) + '-01',
-    asking_price: is_donation ? null : parseFloat(asking_price),
-    is_donation: !!is_donation,
+    seller_id:      user.id,
+    title:          title.trim(),
+    brand:          brand?.trim() || null,
+    barcode:        barcode?.trim() || null,
+    quantity:       parseInt(quantity) || 1,
+    best_before:    dateStr,
+    asking_price:   is_donation ? null : parseFloat(asking_price),
+    is_donation:    !!is_donation,
     category,
     delivery_method: delivery_method ?? 'both',
-    postcode: postcode.trim().toUpperCase(),
-    is_sponsored: !!is_sponsored,
+    postcode:       postcode.trim().toUpperCase(),
+    is_sponsored:   !!is_sponsored,
     sponsored_until: is_sponsored ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : null,
-    allergens: allergens?.trim() || null,
-    description: description?.trim() || null,
+    allergens:      allergens?.trim() || null,
+    description:    description?.trim() || null,
+    weight_grams:   weight_grams ? parseInt(weight_grams) : null,
+    expires_at:     expires_at || null,
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Trigger wishlist matching in background (fire and forget)
+  // Trigger wishlist matching (fire and forget)
   fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/match-wishlists`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ listing: data }),
-  }).catch(() => {}) // non-blocking
+  }).catch(() => {})
 
   return NextResponse.json({ data }, { status: 201 })
 }

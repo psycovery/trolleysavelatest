@@ -35,6 +35,7 @@ export type Listing = {
   is_sponsored: boolean
   sponsored_until: string | null
   image_url: string | null
+  weight_grams: number | null
   allergens: string | null
   description: string | null
   expires_at: string | null
