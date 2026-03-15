@@ -1,17 +1,16 @@
 'use client'
 // src/components/layout/BottomNav.tsx
 import Link from 'next/link'
-import { Home, Search, Heart, User, Plus } from 'lucide-react'
+import { Home, Barcode, Heart, User, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function BottomNav({ onSell }: { onSell: () => void }) {
-  // usePathname removed — active state handled by CSS :active instead
   const navItems = [
-    { href: '/',        icon: Home,   label: 'Home'    },
-    { href: '/listing', icon: Search, label: 'Browse'  },
+    { href: '/',                  icon: Home,    label: 'Home'    },
+    { href: '/product-checker',   icon: Barcode, label: 'Checker' },
     null,
-    { href: '/buyer',   icon: Heart,  label: 'Saved'   },
-    { href: '/seller',  icon: User,   label: 'Profile' },
+    { href: '/buyer',             icon: Heart,   label: 'Saved'   },
+    { href: '/seller',            icon: User,    label: 'Profile' },
   ]
 
   return (

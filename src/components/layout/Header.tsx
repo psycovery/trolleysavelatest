@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ShoppingBasket, Bell, Heart, Search } from 'lucide-react'
+import { ShoppingBasket, Bell, Heart, Search, Barcode } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Logo } from '@/components/ui/Logo'
 
@@ -68,6 +68,10 @@ export function Header({ onSell }: { onSell?: () => void } = {}) {
 
         {/* Actions */}
         <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+          <Link href="/product-checker" className="icon-btn hidden sm:flex" title="Product Checker">
+            <Barcode className="w-5 h-5" />
+          </Link>
+
           <Link href="/basket" className="icon-btn relative" title="Basket">
             <ShoppingBasket className="w-5 h-5" />
             {basketCount > 0 && (
