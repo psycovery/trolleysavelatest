@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: Request) {
   const body = await request.text()
   const sig  = request.headers.get('stripe-signature')!
@@ -23,7 +25,6 @@ export async function POST(request: Request) {
       const { type, listing_id, buyer_id } = pi.metadata
 
       if (type === 'donation_claim') {
-        // Mark listing as donated, claim as confirmed
         await supabase.from('donation_claims')
           .update({ status: 'confirmed' })
           .eq('stripe_payment_intent_id', pi.id)
@@ -32,23 +33,29 @@ export async function POST(request: Request) {
           .update({ status: 'donated' })
           .eq('id', listing_id)
 
-        // Record transaction (fee to TrolleySave, no seller payout)
-        await supabase.from('transactions').insert({
-          donation_claim_id: (await supabase.from('donation_claims').select('id').eq('stripe_payment_intent_id', pi.id).single()).data?.id,
-          seller_id: null,
-          buyer_id,
-          gross_amount: pi.amount / 100,
-          platform_fee: pi.amount / 100,
-          net_payout: 0,
-          payout_status: 'paid',
-        })
+        const { data: claim } = await supabase
+          .from('donation_claims')
+          .select('id')
+          .eq('stripe_payment_intent_id', pi.id)
+          .single()
+
+        if (claim) {
+          await supabase.from('transactions').insert({
+            donation_claim_id: claim.id,
+            seller_id: null,
+            buyer_id,
+            gross_amount: pi.amount / 100,
+            platform_fee: pi.amount / 100,
+            net_payout: 0,
+            payout_status: 'paid',
+          })
+        }
       }
       break
     }
 
     case 'payment_intent.payment_failed': {
       const pi = event.data.object as Stripe.PaymentIntent
-      // Release donation claim if payment failed
       await supabase.from('donation_claims')
         .update({ status: 'expired' })
         .eq('stripe_payment_intent_id', pi.id)
@@ -67,7 +74,6 @@ export async function POST(request: Request) {
 
     case 'transfer.created': {
       const transfer = event.data.object as Stripe.Transfer
-      // Update payout status when transfer created
       await supabase.from('transactions')
         .update({ payout_status: 'paid', stripe_transfer_id: transfer.id })
         .eq('stripe_transfer_id', null)
@@ -76,11 +82,8 @@ export async function POST(request: Request) {
     }
 
     default:
-      // Unhandled event type — ignore
       break
   }
 
   return NextResponse.json({ received: true })
 }
-
-export const dynamic = 'force-dynamic'
