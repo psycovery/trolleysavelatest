@@ -55,7 +55,7 @@ export function SellModal({ open, onClose }: Props) {
         body: JSON.stringify({
           title: title.trim(),
           quantity: parseInt(quantity) || 1,
-          best_before: bestBefore,
+          best_before: bestBefore.length === 7 ? `${bestBefore}-01` : bestBefore,
           asking_price: isDonate ? null : priceNum,
           is_donation: isDonate,
           category,
