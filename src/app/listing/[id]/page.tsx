@@ -31,7 +31,7 @@ export default function ListingDetailPage() {
       // Use maybeSingle() instead of single() — won't throw if not found
       const { data, error } = await supabase
         .from('listings')
-        .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,rating,sales_count,postcode,created_at)')
+        .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,nickname,rating,sales_count,postcode,created_at)')
         .eq('id', id)
         .maybeSingle()
 
@@ -44,7 +44,7 @@ export default function ListingDetailPage() {
       if (!data) {
         const { data: ownListing } = await supabase
           .from('listings')
-          .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,rating,sales_count,postcode,created_at)')
+          .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,nickname,rating,sales_count,postcode,created_at)')
           .eq('id', id)
           .maybeSingle()
         setListing(ownListing as Listing)
@@ -119,7 +119,7 @@ export default function ListingDetailPage() {
                   {seller.full_name?.charAt(0)}
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold">{seller.full_name}</p>
+                  <p className="font-semibold">{seller.nickname || seller.full_name.split(' ')[0]}</p>
                   <p className="text-xs text-gray-400">{seller.postcode}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <StarRating rating={seller.rating ?? 0} size="md" />
