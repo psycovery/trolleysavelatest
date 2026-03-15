@@ -18,7 +18,7 @@ export default function HomePage() {
 
   return (
     <>
-      <Header />
+      <Header onSell={() => setSellOpen(true)} />
 
       {/* Hero */}
       <section className="bg-gradient-to-br from-green-800 via-green-700 to-green-600 text-white py-12 px-4 relative overflow-hidden">

@@ -7,7 +7,7 @@ import { ShoppingBasket, Bell, Heart, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Logo } from '@/components/ui/Logo'
 
-export function Header() {
+export function Header({ onSell }: { onSell?: () => void } = {}) {
   const router = useRouter()
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
@@ -97,7 +97,11 @@ export function Header() {
           )}
 
           <button
-            onClick={() => router.push(user ? '/?sell=1' : '/auth/login')}
+            onClick={() => {
+              if (onSell) { onSell() }
+              else if (user) { router.push('/seller') }
+              else { router.push('/auth/login') }
+            }}
             className="btn btn-primary btn-sm"
           >
             + List item
