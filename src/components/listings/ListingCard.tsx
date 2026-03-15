@@ -104,7 +104,23 @@ export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false
           </div>
 
           {listing.seller && (
-            <div className="flex items-center gap-1 mb-2">
+            <div className="flex items-center gap-2 mb-2">
+              {/* Seller avatar */}
+              <div className="w-5 h-5 rounded-full overflow-hidden bg-green-600 flex-shrink-0 flex items-center justify-center">
+                {(listing.seller as any).avatar_url ? (
+                  <Image
+                    src={(listing.seller as any).avatar_url}
+                    alt={sellerDisplay}
+                    width={20}
+                    height={20}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white font-bold text-[8px]">
+                    {sellerDisplay.charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
               <StarRating rating={listing.seller.rating ?? 0} />
               <span className="text-xs text-gray-500">
                 {listing.seller.rating?.toFixed(1)} · {sellerDisplay}
