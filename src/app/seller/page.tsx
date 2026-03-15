@@ -1,31 +1,34 @@
 'use client'
 // src/app/seller/page.tsx
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { SellModal } from '@/components/modals/SellModal'
 import { Toast, showToast, Spinner, StarRating, Badge, SectionHeader } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { formatPounds, formatDate, calcSellerFee } from '@/lib/utils'
+import { formatPounds, formatDate } from '@/lib/utils'
 import type { Profile, Listing, Offer, Transaction, Review } from '@/types'
 
 export default function SellerPage() {
   const supabase = createClient()
   const router = useRouter()
-  const searchParams = useSearchParams()
 
-  const [profile, setProfile]       = useState<Profile | null>(null)
-  const [listings, setListings]     = useState<Listing[]>([])
-  const [offers, setOffers]         = useState<Offer[]>([])
+  const [profile, setProfile]           = useState<Profile | null>(null)
+  const [listings, setListings]         = useState<Listing[]>([])
+  const [offers, setOffers]             = useState<Offer[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [reviews, setReviews]       = useState<Review[]>([])
-  const [sellOpen, setSellOpen]     = useState(false)
-  const [loading, setLoading]       = useState(true)
+  const [reviews, setReviews]           = useState<Review[]>([])
+  const [sellOpen, setSellOpen]         = useState(false)
+  const [loading, setLoading]           = useState(true)
 
   useEffect(() => {
-    if (searchParams.get('stripe') === 'success') showToast('✅ Bank account connected!')
-    if (searchParams.get('stripe') === 'refresh')  showToast('⚠️ Please complete bank account setup')
+    // Check for Stripe redirect params without useSearchParams
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('stripe') === 'success') showToast('✅ Bank account connected!')
+      if (params.get('stripe') === 'refresh')  showToast('⚠️ Please complete bank account setup')
+    }
   }, [])
 
   useEffect(() => {
@@ -33,18 +36,33 @@ export default function SellerPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/login?redirectTo=/seller'); return }
 
+      const listingIds = (await supabase.from('listings').select('id').eq('seller_id', user.id)).data?.map(l => l.id) ?? []
+
       const [{ data: p }, { data: l }, { data: o }, { data: t }, { data: r }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('listings').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('offers').select('*, listing:listings(title,asking_price), buyer:profiles(full_name,postcode)')
-          .in('listing_id', (await supabase.from('listings').select('id').eq('seller_id', user.id)).data?.map(l => l.id) ?? [])
-          .eq('status', 'pending').order('created_at', { ascending: false }),
-        supabase.from('transactions').select('*, buyer:profiles(full_name)').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(20),
-        supabase.from('reviews').select('*, buyer:profiles(full_name), listing:listings(title)').eq('seller_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('offers')
+          .select('*, listing:listings(title,asking_price), buyer:profiles(full_name,postcode)')
+          .in('listing_id', listingIds.length > 0 ? listingIds : ['none'])
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false }),
+        supabase.from('transactions')
+          .select('*, buyer:profiles(full_name)')
+          .eq('seller_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase.from('reviews')
+          .select('*, buyer:profiles(full_name), listing:listings(title)')
+          .eq('seller_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10),
       ])
 
-      setProfile(p); setListings(l ?? []); setOffers(o ?? [])
-      setTransactions(t ?? []); setReviews(r ?? [])
+      setProfile(p)
+      setListings(l ?? [])
+      setOffers(o ?? [])
+      setTransactions(t ?? [])
+      setReviews(r ?? [])
       setLoading(false)
     }
     load()
@@ -69,9 +87,9 @@ export default function SellerPage() {
     window.location.href = url
   }
 
-  const totalEarned     = transactions.filter(t => t.payout_status === 'paid').reduce((s, t) => s + t.net_payout, 0)
-  const awaitingPayout  = transactions.filter(t => t.payout_status === 'pending').reduce((s, t) => s + t.net_payout, 0)
-  const activeListings  = listings.filter(l => l.status === 'active').length
+  const totalEarned    = transactions.filter(t => t.payout_status === 'paid').reduce((s, t) => s + t.net_payout, 0)
+  const awaitingPayout = transactions.filter(t => t.payout_status === 'pending').reduce((s, t) => s + t.net_payout, 0)
+  const activeListings = listings.filter(l => l.status === 'active').length
 
   if (loading) return <div className="flex items-center justify-center min-h-screen"><Spinner size={32} /></div>
 
@@ -92,7 +110,8 @@ export default function SellerPage() {
               <span>★ {profile?.rating?.toFixed(1) ?? 'New'}</span>
               <span>{profile?.sales_count} sales</span>
               {!profile?.stripe_verified && (
-                <button onClick={connectStripe} className="bg-amber-400 text-amber-700 px-3 py-0.5 rounded-full text-xs font-bold">
+                <button onClick={connectStripe}
+                  className="bg-amber-400 text-amber-700 px-3 py-0.5 rounded-full text-xs font-bold">
                   ⚠️ Set up payouts
                 </button>
               )}
@@ -104,9 +123,9 @@ export default function SellerPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
           {[
-            { label: 'Total earned', value: formatPounds(totalEarned), color: 'text-green-700' },
-            { label: 'Active listings', value: activeListings, color: 'text-amber-500' },
-            { label: 'Pending offers', value: offers.length, color: 'text-green-700' },
+            { label: 'Total earned',    value: formatPounds(totalEarned),    color: 'text-green-700' },
+            { label: 'Active listings', value: activeListings,               color: 'text-amber-500' },
+            { label: 'Pending offers',  value: offers.length,                color: 'text-green-700' },
             { label: 'Awaiting payout', value: formatPounds(awaitingPayout), color: 'text-green-700' },
           ].map(s => (
             <div key={s.label} className="bg-white border border-gray-100 rounded-[14px] p-4 text-center">
@@ -125,7 +144,9 @@ export default function SellerPage() {
                 <div key={offer.id} className="bg-white border border-amber-200 rounded-[14px] p-4 flex items-center gap-4 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm">{(offer.listing as any)?.title}</p>
-                    <p className="text-xs text-gray-400">From {(offer.buyer as any)?.full_name} · {formatDate(offer.created_at)}</p>
+                    <p className="text-xs text-gray-400">
+                      From {(offer.buyer as any)?.full_name} · {formatDate(offer.created_at)}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="font-display text-xl font-bold text-amber-500">{formatPounds(offer.amount)}</p>
@@ -159,7 +180,9 @@ export default function SellerPage() {
                 <div key={l.id} className="bg-white border border-gray-100 rounded-[14px] p-4 flex items-center gap-4 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{l.title}</p>
-                    <p className="text-xs text-gray-400">{l.view_count} views · {formatDate(l.created_at)}</p>
+                    <p className="text-xs text-gray-400">
+                      {(l as any).view_count ?? 0} views · {formatDate(l.created_at)}
+                    </p>
                   </div>
                   {l.is_donation ? (
                     <Badge variant="donate">🆓 Free</Badge>
@@ -197,7 +220,9 @@ export default function SellerPage() {
                       </div>
                       <StarRating rating={r.rating} />
                     </div>
-                    {r.review_text && <p className="text-sm text-gray-500 leading-relaxed">{r.review_text}</p>}
+                    {r.review_text && (
+                      <p className="text-sm text-gray-500 leading-relaxed">{r.review_text}</p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -227,8 +252,8 @@ export default function SellerPage() {
             </div>
           </div>
         )}
-      </main>
 
+      </main>
       <Footer />
       <SellModal open={sellOpen} onClose={() => setSellOpen(false)} />
       <Toast />
