@@ -21,6 +21,7 @@ export default function ListingDetailPage() {
   const supabase = createClient()
 
   const [listing, setListing]     = useState<Listing | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([])
   const [loading, setLoading]     = useState(true)
   const [offerOpen, setOfferOpen]   = useState(false)
@@ -30,6 +31,10 @@ export default function ListingDetailPage() {
   useEffect(() => {
     async function load() {
       if (!id) return
+
+      // Get current user for own-listing check
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id ?? null)
 
       // Use maybeSingle() instead of single() — won't throw if not found
       const { data, error } = await supabase
@@ -258,12 +263,18 @@ export default function ListingDetailPage() {
               </div>
             )}
 
-            {listing.is_donation ? (
+            {(() => {
+              const isOwnListing = currentUserId === listing.seller_id
+              return listing.is_donation ? (
               <button onClick={() => setClaimOpen(true)}
                 className="btn btn-primary w-full justify-center py-4 text-base rounded-lg bg-green-600">
                 🆓 Claim for free
               </button>
-            ) : (
+              ) : isOwnListing ? (
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 text-center text-sm text-gray-500">
+                  This is your listing
+                </div>
+              ) : (
               <div className="flex gap-3">
                 <button onClick={() => setOfferOpen(true)}
                   className="btn btn-amber flex-1 justify-center py-4 text-base rounded-lg font-bold">
@@ -274,7 +285,8 @@ export default function ListingDetailPage() {
                   Buy now — {formatPounds(listing.asking_price!)}
                 </button>
               </div>
-            )}
+              )
+            })()}
             <p className="text-xs text-gray-400 text-center mt-2">
               {listing.is_donation
                 ? '0.5% claim fee (min. £1) · Plus any postage'
