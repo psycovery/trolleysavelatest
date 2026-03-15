@@ -175,6 +175,7 @@ export function SellModal({ open, onClose }: Props) {
   }
 
   return (
+    <>
     <div className={cn('modal-overlay', open && 'open')} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="w-9 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
@@ -421,15 +422,14 @@ export function SellModal({ open, onClose }: Props) {
       </div>
     </div>
 
-      {/* Card setup modal */}
-      <CardSetupModal
-        open={cardModalOpen}
-        onClose={() => setCardModalOpen(false)}
-        onSuccess={() => {
-          setCardModalOpen(false)
-          checkPaymentMethod().then(() => setSponsored(true))
-        }}
-      />
-    </div>
+    <CardSetupModal
+      open={cardModalOpen}
+      onClose={() => setCardModalOpen(false)}
+      onSuccess={() => {
+        setCardModalOpen(false)
+        checkPaymentMethod().then(() => setSponsored(true))
+      }}
+    />
+  </>
   )
 }
