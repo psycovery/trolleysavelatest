@@ -58,6 +58,26 @@ export function SellModal({ open, onClose }: Props) {
   const fee      = isDonate ? calcDonationFee(priceNum) : calcSellerFee(priceNum)
   const payout   = isDonate ? 0 : calcSellerPayout(priceNum)
 
+  async function checkPaymentMethod() {
+    setCheckingCard(true)
+    const res = await fetch('/api/stripe/payment-method')
+    const { paymentMethod: pm } = await res.json()
+    setPaymentMethod(pm)
+    setCheckingCard(false)
+    return pm
+  }
+
+  async function handleSponsorToggle() {
+    if (!sponsored) {
+      const pm = await checkPaymentMethod()
+      if (!pm) {
+        setCardModalOpen(true)
+        return
+      }
+    }
+    setSponsored(!sponsored)
+  }
+
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
