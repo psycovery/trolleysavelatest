@@ -60,16 +60,16 @@ export default function BuyerPage() {
       const [{ data: p }, { data: s }, { data: w }, { data: m }, { data: o }, { data: h }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', u.id).single(),
         supabase.from('saved_listings')
-          .select('listing:listings(*, seller:profiles(full_name,rating,postcode))')
+          .select('listing:listings(*, seller:profiles!listings_seller_id_fkey(full_name,rating,postcode))')
           .eq('user_id', u.id)
           .order('created_at', { ascending: false }),
         supabase.from('wishlists').select('*').eq('buyer_id', u.id).order('created_at', { ascending: false }),
         supabase.from('wishlist_matches')
-          .select('*, listing:listings(*, seller:profiles(full_name,rating,postcode)), wishlist:wishlists(product_name,match_type)')
+          .select('*, listing:listings(*, seller:profiles!listings_seller_id_fkey(full_name,rating,postcode)), wishlist:wishlists(product_name,match_type)')
           .eq('buyer_id', u.id)
           .order('notified_at', { ascending: false }),
         supabase.from('offers')
-          .select('*, listing:listings(*, seller:profiles(full_name,rating,postcode))')
+          .select('*, listing:listings(*, seller:profiles!listings_seller_id_fkey(full_name,rating,postcode))')
           .eq('buyer_id', u.id)
           .order('created_at', { ascending: false }),
         supabase.from('transactions')
