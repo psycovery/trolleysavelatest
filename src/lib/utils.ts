@@ -66,6 +66,43 @@ export function isPastBestBefore(dateStr: string): boolean {
   return new Date(dateStr) < new Date()
 }
 
+/**
+ * Returns a human-readable countdown for a listing expiry date.
+ * e.g. "3 days left", "Expires today", "Expired"
+ */
+export function timeRemaining(expiresAt: string | null | undefined): string | null {
+  if (!expiresAt) return null
+  const now = new Date()
+  const exp = new Date(expiresAt)
+  const diffMs = exp.getTime() - now.getTime()
+
+  if (diffMs <= 0) return 'Expired'
+
+  const diffMins  = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays  = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 60)  return `${diffMins}m left`
+  if (diffHours < 24) return `${diffHours}h left`
+  if (diffDays === 1) return '1 day left'
+  if (diffDays <= 7)  return `${diffDays} days left`
+  if (diffDays <= 30) return `${Math.ceil(diffDays / 7)} weeks left`
+  return null // no urgency label needed for far-future dates
+}
+
+/**
+ * Returns urgency level for colour coding.
+ * 'critical' = expires today/tomorrow, 'warning' = this week, 'ok' = fine
+ */
+export function expiryUrgency(expiresAt: string | null | undefined): 'critical' | 'warning' | 'ok' | null {
+  if (!expiresAt) return null
+  const diffDays = Math.floor((new Date(expiresAt).getTime() - Date.now()) / 86400000)
+  if (diffDays < 0)  return null
+  if (diffDays <= 1) return 'critical'
+  if (diffDays <= 7) return 'warning'
+  return 'ok'
+}
+
 export function truncate(str: string, n: number): string {
   return str.length > n ? str.slice(0, n) + '…' : str
 }

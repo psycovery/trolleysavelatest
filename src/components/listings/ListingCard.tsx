@@ -2,9 +2,9 @@
 // src/components/listings/ListingCard.tsx
 import Link from 'next/link'
 import Image from 'next/image'
-import { Heart } from 'lucide-react'
+import { Heart, Clock } from 'lucide-react'
 import { Listing } from '@/types'
-import { formatPounds, calcSaving, formatBestBefore, isExpiringSoon } from '@/lib/utils'
+import { formatPounds, calcSaving, formatBestBefore, isExpiringSoon, timeRemaining, expiryUrgency } from '@/lib/utils'
 import { Badge, StarRating, TinPlaceholder } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
@@ -17,9 +17,17 @@ interface ListingCardProps {
 }
 
 export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false }: ListingCardProps) {
-  const isDonation = listing.is_donation
+  const isDonation  = listing.is_donation
   const isSponsored = listing.is_sponsored
   const expiringSoon = isExpiringSoon(listing.best_before)
+
+  // Listing expiry countdown
+  const expiresIn = timeRemaining((listing as any).expires_at)
+  const urgency   = expiryUrgency((listing as any).expires_at)
+
+  const sellerDisplay = (listing.seller as any)?.nickname
+    || listing.seller?.full_name?.split(' ')[0]
+    || ''
 
   return (
     <div className={cn(
@@ -54,6 +62,19 @@ export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false
             <span className="absolute top-2 left-2"><Badge variant="red">Ends soon</Badge></span>
           )}
 
+          {/* Listing expiry countdown — bottom of image */}
+          {expiresIn && (
+            <div className={cn(
+              'absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 py-1 text-[10px] font-bold',
+              urgency === 'critical' ? 'bg-red-500/90 text-white' :
+              urgency === 'warning'  ? 'bg-amber-400/90 text-amber-900' :
+              'bg-gray-800/70 text-white'
+            )}>
+              <Clock className="w-2.5 h-2.5" />
+              {expiresIn}
+            </div>
+          )}
+
           {/* Save button */}
           <button
             onClick={e => { e.preventDefault(); onSave?.(listing) }}
@@ -86,7 +107,7 @@ export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false
             <div className="flex items-center gap-1 mb-2">
               <StarRating rating={listing.seller.rating ?? 0} />
               <span className="text-xs text-gray-500">
-                {listing.seller.rating?.toFixed(1)} · {(listing.seller as any).nickname || listing.seller.full_name.split(' ')[0]}
+                {listing.seller.rating?.toFixed(1)} · {sellerDisplay}
               </span>
             </div>
           )}

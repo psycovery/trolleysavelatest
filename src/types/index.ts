@@ -4,6 +4,7 @@ export type Profile = {
   id: string
   full_name: string
   nickname: string | null
+  avatar_url: string | null
   postcode: string
   stripe_account_id: string | null
   stripe_verified: boolean
@@ -24,8 +25,8 @@ export type Listing = {
   brand: string | null
   barcode: string | null
   quantity: number
-  best_before: string
-  asking_price: number | null
+  best_before: string         // ISO date YYYY-MM-DD
+  asking_price: number | null // null = donation
   is_donation: boolean
   category: string
   delivery_method: DeliveryMethod
@@ -36,7 +37,9 @@ export type Listing = {
   image_url: string | null
   allergens: string | null
   description: string | null
+  expires_at: string | null
   created_at: string
+  // Joined
   seller?: Profile
 }
 
@@ -50,6 +53,7 @@ export type Offer = {
   status: OfferStatus
   stripe_payment_intent_id: string | null
   created_at: string
+  // Joined
   listing?: Listing
   buyer?: Profile
 }
@@ -58,12 +62,13 @@ export type DonationClaim = {
   id: string
   listing_id: string
   buyer_id: string
-  platform_fee: number
+  platform_fee: number        // min £1.00
   delivery_method: DeliveryMethod
   status: 'claimed' | 'confirmed' | 'expired'
   message: string | null
   claimed_at: string
   expires_at: string
+  // Joined
   listing?: Listing
 }
 
@@ -74,7 +79,7 @@ export type WishlistItem = {
   buyer_id: string
   product_name: string
   match_type: MatchType
-  location_radius: number
+  location_radius: number     // miles
   created_at: string
 }
 
@@ -85,6 +90,7 @@ export type WishlistMatch = {
   buyer_id: string
   notified_at: string
   seen: boolean
+  // Joined
   listing?: Listing
   wishlist?: WishlistItem
 }
@@ -94,9 +100,10 @@ export type Review = {
   seller_id: string
   buyer_id: string
   listing_id: string
-  rating: number
+  rating: number              // 1–5
   review_text: string | null
   created_at: string
+  // Joined
   buyer?: Profile
   listing?: Listing
 }
@@ -114,7 +121,9 @@ export type Transaction = {
   net_payout: number
   stripe_transfer_id: string | null
   payout_status: PayoutStatus
+  expires_at: string | null
   created_at: string
+  // Joined
   seller?: Profile
   buyer?: Profile
 }
@@ -126,8 +135,10 @@ export type BasketItem = {
   quantity: number
 }
 
+// API response shapes
 export type ApiSuccess<T> = { data: T; error: null }
 export type ApiError     = { data: null; error: string }
 export type ApiResponse<T> = ApiSuccess<T> | ApiError
 
+// Stripe Connect onboarding
 export type StripeConnectStatus = 'not_started' | 'pending' | 'verified' | 'failed'

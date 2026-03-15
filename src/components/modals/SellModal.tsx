@@ -29,6 +29,7 @@ export function SellModal({ open, onClose }: Props) {
   const [category, setCategory]     = useState('')
   const [delivery, setDelivery]     = useState('both')
   const [conditionOk, setConditionOk] = useState(false)
+  const [expiresAt, setExpiresAt]   = useState('')
   const [sponsored, setSponsored]   = useState(false)
   const [loading, setLoading]       = useState(false)
 
@@ -69,6 +70,7 @@ export function SellModal({ open, onClose }: Props) {
           delivery_method: delivery,
           postcode: postcode.trim().toUpperCase(),
           is_sponsored: sponsored,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         }),
       })
       const data = await res.json()
@@ -81,7 +83,7 @@ export function SellModal({ open, onClose }: Props) {
 
       // Reset form
       setTitle(''); setQuantity('1'); setBestBefore(''); setPrice('')
-      setPostcode(''); setCategory(''); setConditionOk(false); setSponsored(false)
+      setPostcode(''); setCategory(''); setConditionOk(false); setSponsored(false); setExpiresAt('')
       setType('sell')
     } catch (err: any) {
       showToast(`❌ ${err.message}`)
@@ -182,6 +184,22 @@ export function SellModal({ open, onClose }: Props) {
                 <option value="post">Post only</option>
               </select>
             </div>
+          </div>
+
+          {/* Optional listing expiry */}
+          <div>
+            <label className="label">
+              Listing expires <span className="normal-case font-normal tracking-normal text-gray-400">— optional</span>
+            </label>
+            <input
+              type="date"
+              value={expiresAt}
+              onChange={e => setExpiresAt(e.target.value)}
+              className="input"
+              min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+              placeholder="Leave blank to keep active indefinitely"
+            />
+            <p className="text-xs text-gray-400 mt-1">Leave blank to keep listed until sold</p>
           </div>
 
           {/* Payout preview */}

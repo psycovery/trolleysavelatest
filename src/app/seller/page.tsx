@@ -1,7 +1,8 @@
 'use client'
 // src/app/seller/page.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { SellModal } from '@/components/modals/SellModal'
@@ -9,10 +10,12 @@ import { Toast, showToast, Spinner, StarRating, Badge, SectionHeader } from '@/c
 import { createClient } from '@/lib/supabase/client'
 import { formatPounds, formatDate } from '@/lib/utils'
 import type { Profile, Listing, Offer, Transaction, Review } from '@/types'
+import { Camera } from 'lucide-react'
 
 export default function SellerPage() {
   const supabase = createClient()
   const router = useRouter()
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const [profile, setProfile]           = useState<Profile | null>(null)
   const [listings, setListings]         = useState<Listing[]>([])
@@ -21,6 +24,7 @@ export default function SellerPage() {
   const [reviews, setReviews]           = useState<Review[]>([])
   const [sellOpen, setSellOpen]         = useState(false)
   const [loading, setLoading]           = useState(true)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   // Nickname editing
   const [editingNickname, setEditingNickname] = useState(false)
@@ -73,6 +77,50 @@ export default function SellerPage() {
     load()
   }, [])
 
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('⚠️ Image must be under 2MB')
+      return
+    }
+
+    setUploadingAvatar(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const ext = file.name.split('.').pop()
+    const path = `${user.id}/avatar.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true })
+
+    if (uploadError) {
+      showToast(`❌ Upload failed: ${uploadError.message}`)
+      setUploadingAvatar(false)
+      return
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(path)
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('id', user.id)
+
+    if (updateError) {
+      showToast(`❌ ${updateError.message}`)
+    } else {
+      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
+      showToast('✅ Profile photo updated!')
+    }
+    setUploadingAvatar(false)
+  }
+
   async function saveNickname() {
     if (!nicknameInput.trim()) { showToast('⚠️ Enter a nickname'); return }
     if (nicknameInput.trim().length < 2) { showToast('⚠️ Nickname must be at least 2 characters'); return }
@@ -90,7 +138,7 @@ export default function SellerPage() {
     } else {
       setProfile(prev => prev ? { ...prev, nickname: nicknameInput.trim() } : prev)
       setEditingNickname(false)
-      showToast('✅ Nickname updated! This will show on your listings.')
+      showToast('✅ Nickname updated!')
     }
     setSavingNickname(false)
   }
@@ -128,9 +176,41 @@ export default function SellerPage() {
 
         {/* Profile header */}
         <div className="bg-gradient-to-r from-green-800 to-green-600 rounded-[14px] p-6 text-white mb-6 flex items-center gap-5 flex-wrap">
-          <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center font-display text-3xl font-bold flex-shrink-0">
-            {displayName.charAt(0).toUpperCase()}
+          {/* Avatar */}
+          <div className="relative flex-shrink-0">
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-white/20 flex items-center justify-center">
+              {(profile as any)?.avatar_url ? (
+                <Image
+                  src={(profile as any).avatar_url}
+                  alt={displayName}
+                  width={80}
+                  height={80}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="font-display text-3xl font-bold">
+                  {displayName.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            {/* Upload button */}
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-white text-green-700 flex items-center justify-center shadow-md hover:bg-green-50 transition-colors"
+              title="Change photo"
+            >
+              {uploadingAvatar ? <Spinner size={12} /> : <Camera className="w-3.5 h-3.5" />}
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleAvatarUpload}
+            />
           </div>
+
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="font-display text-xl font-bold">{displayName}</h1>
@@ -161,7 +241,7 @@ export default function SellerPage() {
             <div className="flex-1">
               <h2 className="font-display text-lg font-bold mb-1">Your public nickname</h2>
               <p className="text-sm text-gray-500 mb-3">
-                This is shown on your listings instead of your real name. Keep it friendly and memorable.
+                Shown on your listings instead of your real name.
               </p>
               {!editingNickname ? (
                 <div className="flex items-center gap-3">
@@ -185,7 +265,7 @@ export default function SellerPage() {
                     value={nicknameInput}
                     onChange={e => setNicknameInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && saveNickname()}
-                    placeholder="e.g. TinHunter99, BargainBob, SurplusSam"
+                    placeholder="e.g. TinHunter99, BargainBob"
                     maxLength={30}
                     autoFocus
                     className="input flex-1 max-w-xs"
@@ -208,7 +288,6 @@ export default function SellerPage() {
             <span className="flex-shrink-0 text-green-600">🔒</span>
             <p className="text-xs text-green-700 leading-relaxed">
               Your real name <strong>{profile?.full_name}</strong> is never shown publicly.
-              Only your nickname appears on listings, offers, and reviews.
             </p>
           </div>
         </div>

@@ -88,7 +88,7 @@ export default function ListingDetailPage() {
     <>
       <Header />
       <main className="max-w-5xl mx-auto px-4 py-6 pb-24">
-        <button onClick={() => router.back()}
+        <button onClick={() => { if (window.history.length > 1) router.back(); else router.push('/') }}
           className="flex items-center gap-2 text-gray-500 text-sm mb-5 hover:text-gray-700 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to listings
         </button>
