@@ -90,8 +90,8 @@ export function Header({ onSell }: { onSell?: () => void } = {}) {
             )}
           </Link>
 
-          <Link href="/buyer" className="icon-btn hidden sm:flex" title="Saved">
-            <Heart className="w-5 h-5" />
+          <Link href="/buyer" className="btn btn-outline btn-sm hidden sm:flex items-center gap-1.5" title="My purchases & wishlist">
+            <Heart className="w-3.5 h-3.5" /> Buyer
           </Link>
 
           {user ? (
