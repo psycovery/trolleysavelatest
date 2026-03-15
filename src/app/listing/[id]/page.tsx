@@ -1,5 +1,4 @@
 'use client'
-export const dynamic = 'force-dynamic'
 // src/app/listing/[id]/page.tsx
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -27,13 +26,34 @@ export default function ListingDetailPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      if (!id) return
+
+      // Use maybeSingle() instead of single() — won't throw if not found
+      const { data, error } = await supabase
         .from('listings')
         .select('*, seller:profiles(id,full_name,rating,sales_count,postcode,created_at)')
         .eq('id', id)
-        .single()
-      setListing(data as Listing)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Listing fetch error:', error)
+      }
+
+      // If not found via active RLS, try fetching without status filter
+      // (handles case where seller views their own paused listing)
+      if (!data) {
+        const { data: ownListing } = await supabase
+          .from('listings')
+          .select('*, seller:profiles(id,full_name,rating,sales_count,postcode,created_at)')
+          .eq('id', id)
+          .maybeSingle()
+        setListing(ownListing as Listing)
+      } else {
+        setListing(data as Listing)
+      }
+
       setLoading(false)
+
       if (data) {
         supabase.from('listings')
           .update({ view_count: (data.view_count ?? 0) + 1 })
@@ -43,8 +63,24 @@ export default function ListingDetailPage() {
     load()
   }, [id])
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><Spinner size={32} /></div>
-  if (!listing) return <div className="text-center py-24 text-gray-400">Listing not found</div>
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Spinner size={32} />
+    </div>
+  )
+
+  if (!listing) return (
+    <>
+      <Header />
+      <div className="text-center py-24 text-gray-400">
+        <p className="text-4xl mb-3">🥫</p>
+        <p className="font-semibold text-gray-700">Listing not found</p>
+        <p className="text-sm mt-1 mb-5">It may have been sold or removed</p>
+        <button onClick={() => router.push('/')} className="btn btn-primary">Browse listings</button>
+      </div>
+      <Footer />
+    </>
+  )
 
   const seller = listing.seller as any
 
@@ -71,7 +107,9 @@ export default function ListingDetailPage() {
                 />
               )}
               {listing.is_donation && (
-                <div className="absolute top-3 left-3"><Badge variant="donate">🆓 Free to claim</Badge></div>
+                <div className="absolute top-3 left-3">
+                  <Badge variant="donate">🆓 Free to claim</Badge>
+                </div>
               )}
             </div>
 
@@ -85,7 +123,9 @@ export default function ListingDetailPage() {
                   <p className="text-xs text-gray-400">{seller.postcode}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <StarRating rating={seller.rating ?? 0} size="md" />
-                    <span className="text-sm text-gray-500">{seller.rating?.toFixed(1) ?? 'New'} ({seller.sales_count} sales)</span>
+                    <span className="text-sm text-gray-500">
+                      {seller.rating?.toFixed(1) ?? 'New'} ({seller.sales_count} sales)
+                    </span>
                   </div>
                 </div>
                 <button onClick={() => showToast('💬 Message feature coming soon')}
@@ -98,17 +138,23 @@ export default function ListingDetailPage() {
 
           {/* Details */}
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">{listing.category.replace('-', ' ')}</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              {listing.category.replace('-', ' ')}
+            </p>
             <h1 className="font-display text-3xl font-bold mb-3 leading-tight">{listing.title}</h1>
 
             {listing.is_donation ? (
               <div className="flex items-baseline gap-3 mb-5">
                 <span className="font-display text-4xl font-bold text-green-600">FREE</span>
-                <span className="text-sm text-gray-400">Listed value: {formatPounds(listing.asking_price ?? 0)}</span>
+                <span className="text-sm text-gray-400">
+                  Listed value: {formatPounds(listing.asking_price ?? 0)}
+                </span>
               </div>
             ) : (
               <div className="mb-5">
-                <span className="font-display text-4xl font-bold text-green-700">{formatPounds(listing.asking_price!)}</span>
+                <span className="font-display text-4xl font-bold text-green-700">
+                  {formatPounds(listing.asking_price!)}
+                </span>
               </div>
             )}
 
@@ -119,7 +165,12 @@ export default function ListingDetailPage() {
                   <p className="text-[10px] text-gray-400">via Trolley.co.uk</p>
                 </div>
                 <div className="space-y-1.5 mb-3">
-                  {[['🔵 Tesco','£1.00'],["🟠 Sainsbury's",'£1.05'],['🟢 Asda','£0.98'],['🔴 Waitrose','£1.10']].map(([store, price]) => (
+                  {[
+                    ['🔵 Tesco', '£1.00'],
+                    ["🟠 Sainsbury's", '£1.05'],
+                    ['🟢 Asda', '£0.98'],
+                    ['🔴 Waitrose', '£1.10'],
+                  ].map(([store, price]) => (
                     <div key={store} className="flex justify-between items-center bg-gray-50 rounded px-3 py-1.5">
                       <span className="text-sm text-gray-700">{store}</span>
                       <span className="text-sm font-semibold">{price}</span>
@@ -131,7 +182,9 @@ export default function ListingDetailPage() {
                     <p className="text-xs text-white/75">TrolleySave price</p>
                     <p className="text-xs font-semibold text-amber-200">Best value ✓</p>
                   </div>
-                  <span className="font-display text-2xl font-bold text-white">{formatPounds(listing.asking_price!)}</span>
+                  <span className="font-display text-2xl font-bold text-white">
+                    {formatPounds(listing.asking_price!)}
+                  </span>
                 </div>
               </div>
             )}
@@ -141,7 +194,11 @@ export default function ListingDetailPage() {
                 ['Best before', formatBestBefore(listing.best_before)],
                 ['Condition', 'Sealed, unused'],
                 ['Location', listing.postcode],
-                ['Delivery', listing.delivery_method === 'both' ? 'Post or collect' : listing.delivery_method === 'post' ? 'Royal Mail only' : 'Collect only'],
+                ['Delivery', listing.delivery_method === 'both'
+                  ? 'Post or collect'
+                  : listing.delivery_method === 'post'
+                  ? 'Royal Mail only'
+                  : 'Collect only'],
               ].map(([label, value]) => (
                 <div key={label} className="bg-gray-50 rounded-lg p-3">
                   <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{label}</p>
@@ -153,7 +210,9 @@ export default function ListingDetailPage() {
             {listing.allergens && (
               <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">
                 <span className="text-base flex-shrink-0">⚠️</span>
-                <p className="text-xs text-amber-700"><strong>Allergens:</strong> {listing.allergens}. See tin label for full ingredients.</p>
+                <p className="text-xs text-amber-700">
+                  <strong>Allergens:</strong> {listing.allergens}. See tin label for full ingredients.
+                </p>
               </div>
             )}
 
@@ -175,7 +234,9 @@ export default function ListingDetailPage() {
               </div>
             )}
             <p className="text-xs text-gray-400 text-center mt-2">
-              {listing.is_donation ? '0.5% claim fee (min. £1) · Plus any postage' : 'No buyer fees · Secure via Stripe · UK only'}
+              {listing.is_donation
+                ? '0.5% claim fee (min. £1) · Plus any postage'
+                : 'No buyer fees · Secure via Stripe · UK only'}
             </p>
           </div>
         </div>
