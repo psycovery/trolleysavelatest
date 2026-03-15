@@ -211,7 +211,7 @@ export default function ListingDetailPage() {
               {[
                 ['Best before', formatBestBefore(listing.best_before)],
                 ['Condition', 'Sealed, unused'],
-                ['Location', listing.postcode],
+                ...(listing.delivery_method !== 'post' ? [['Location', listing.postcode]] : []),
                 ['Delivery', listing.delivery_method === 'both'
                   ? 'Post or collect'
                   : listing.delivery_method === 'post'
