@@ -19,6 +19,7 @@ export type Listing = {
   id: string
   seller_id: string
   title: string
+  view_count: number
   brand: string | null
   barcode: string | null
   quantity: number
