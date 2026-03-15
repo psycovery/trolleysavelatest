@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { OfferModal } from '@/components/modals/OfferModal'
+import { BuyNowModal } from '@/components/modals/BuyNowModal'
 import { ClaimModal } from '@/components/modals/ClaimModal'
 import { Toast, showToast, Spinner, StarRating, Badge, TinPlaceholder } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
@@ -22,8 +23,9 @@ export default function ListingDetailPage() {
   const [listing, setListing]     = useState<Listing | null>(null)
   const [bundleItems, setBundleItems] = useState<BundleItem[]>([])
   const [loading, setLoading]     = useState(true)
-  const [offerOpen, setOfferOpen] = useState(false)
-  const [claimOpen, setClaimOpen] = useState(false)
+  const [offerOpen, setOfferOpen]   = useState(false)
+  const [claimOpen, setClaimOpen]   = useState(false)
+  const [buyNowOpen, setBuyNowOpen] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -267,7 +269,7 @@ export default function ListingDetailPage() {
                   className="btn btn-amber flex-1 justify-center py-4 text-base rounded-lg font-bold">
                   Make an offer
                 </button>
-                <button onClick={() => setOfferOpen(true)}
+                <button onClick={() => setBuyNowOpen(true)}
                   className="btn btn-primary flex-1 justify-center py-4 text-base rounded-lg font-bold">
                   Buy now — {formatPounds(listing.asking_price!)}
                 </button>
@@ -284,6 +286,7 @@ export default function ListingDetailPage() {
 
       <Footer />
       <OfferModal listing={offerOpen ? listing : null} onClose={() => setOfferOpen(false)} />
+      <BuyNowModal listing={buyNowOpen ? listing : null} onClose={() => setBuyNowOpen(false)} />
       <ClaimModal listing={claimOpen ? listing : null} onClose={() => setClaimOpen(false)} />
       <Toast />
     </>
