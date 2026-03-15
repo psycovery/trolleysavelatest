@@ -1,7 +1,6 @@
 'use client'
 // src/components/modals/SellModal.tsx
 import { useState } from 'react'
-import { Listing } from '@/types'
 import { calcSellerFee, calcSellerPayout, calcDonationFee, formatPounds } from '@/lib/utils'
 import { Spinner } from '@/components/ui'
 import { showToast } from '@/components/ui'
@@ -21,31 +20,39 @@ const CATEGORIES = [
 interface Props { open: boolean; onClose: () => void }
 
 export function SellModal({ open, onClose }: Props) {
-  const [type, setType] = useState<'sell' | 'donate'>('sell')
-  const [title, setTitle] = useState('')
-  const [quantity, setQuantity] = useState('1')
+  const [type, setType]             = useState<'sell' | 'donate'>('sell')
+  const [title, setTitle]           = useState('')
+  const [quantity, setQuantity]     = useState('1')
   const [bestBefore, setBestBefore] = useState('')
-  const [price, setPrice] = useState('')
-  const [postcode, setPostcode] = useState('')
-  const [category, setCategory] = useState('')
-  const [delivery, setDelivery] = useState('both')
+  const [price, setPrice]           = useState('')
+  const [postcode, setPostcode]     = useState('')
+  const [category, setCategory]     = useState('')
+  const [delivery, setDelivery]     = useState('both')
   const [conditionOk, setConditionOk] = useState(false)
-  const [sponsored, setSponsored] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [sponsored, setSponsored]   = useState(false)
+  const [loading, setLoading]       = useState(false)
 
   const priceNum = parseFloat(price) || 0
   const isDonate = type === 'donate'
-
-  const fee     = isDonate ? calcDonationFee(priceNum) : calcSellerFee(priceNum)
-  const payout  = isDonate ? 0 : calcSellerPayout(priceNum)
+  const fee      = isDonate ? calcDonationFee(priceNum) : calcSellerFee(priceNum)
+  const payout   = isDonate ? 0 : calcSellerPayout(priceNum)
 
   async function submit() {
-    if (!title.trim())     { showToast('⚠️ Enter a product name'); return }
-    if (!bestBefore)       { showToast('⚠️ Enter a best before date'); return }
-    if (!priceNum)         { showToast('⚠️ Enter a ' + (isDonate ? 'listed value' : 'price')); return }
-    if (!postcode.trim())  { showToast('⚠️ Enter your postcode'); return }
-    if (!category)         { showToast('⚠️ Choose a category'); return }
-    if (!conditionOk)      { showToast('⚠️ Please confirm the condition'); return }
+    if (!title.trim())    { showToast('⚠️ Enter a product name'); return }
+    if (!bestBefore)      { showToast('⚠️ Enter a best before date'); return }
+    if (!priceNum)        { showToast('⚠️ Enter a ' + (isDonate ? 'listed value' : 'price')); return }
+    if (!postcode.trim()) { showToast('⚠️ Enter your postcode'); return }
+    if (!category)        { showToast('⚠️ Choose a category'); return }
+    if (!conditionOk)     { showToast('⚠️ Please confirm the condition'); return }
+
+    // Ensure date is always in YYYY-MM-DD format
+    let dateStr = bestBefore
+    if (dateStr.length === 7) {
+      dateStr = dateStr + '-01'
+    } else if (dateStr.length < 7) {
+      showToast('⚠️ Please enter a valid best before date')
+      return
+    }
 
     setLoading(true)
     try {
@@ -55,7 +62,7 @@ export function SellModal({ open, onClose }: Props) {
         body: JSON.stringify({
           title: title.trim(),
           quantity: parseInt(quantity) || 1,
-          best_before: bestBefore.length === 7 ? `${bestBefore}-01` : bestBefore,
+          best_before: dateStr,
           asking_price: isDonate ? null : priceNum,
           is_donation: isDonate,
           category,
@@ -124,28 +131,38 @@ export function SellModal({ open, onClose }: Props) {
         <div className="space-y-3 mb-4">
           <div>
             <label className="label">Product name &amp; brand</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} className="input" placeholder="e.g. Heinz Baked Beans" />
+            <input value={title} onChange={e => setTitle(e.target.value)}
+              className="input" placeholder="e.g. Heinz Baked Beans" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Quantity (tins)</label>
-              <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} min="1" className="input" placeholder="1" />
+              <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)}
+                min="1" className="input" placeholder="1" />
             </div>
             <div>
               <label className="label">Best before</label>
-              <input type="month" value={bestBefore} onChange={e => setBestBefore(e.target.value)} className="input" />
+              <input
+                type="date"
+                value={bestBefore}
+                onChange={e => setBestBefore(e.target.value)}
+                className="input"
+                min={new Date().toISOString().split('T')[0]}
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">{isDonate ? 'Listed value (£) — waived to buyer' : 'Asking price (£)'}</label>
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)} step="0.10" min="0.10" className="input" placeholder="0.00" />
+              <input type="number" value={price} onChange={e => setPrice(e.target.value)}
+                step="0.10" min="0.10" className="input" placeholder="0.00" />
             </div>
             <div>
               <label className="label">Your postcode</label>
-              <input value={postcode} onChange={e => setPostcode(e.target.value.toUpperCase())} className="input" placeholder="ST1 4AB" maxLength={8} />
+              <input value={postcode} onChange={e => setPostcode(e.target.value.toUpperCase())}
+                className="input" placeholder="ST1 4AB" maxLength={8} />
             </div>
           </div>
 
@@ -175,7 +192,7 @@ export function SellModal({ open, onClose }: Props) {
                 <span className="font-semibold">{formatPounds(priceNum)}</span>
               </div>
               <div className="flex justify-between text-xs mb-2">
-                <span className="text-gray-500">{isDonate ? `Buyer pays (0.5%, min £1)` : 'TrolleySave fee (1.5%)'}</span>
+                <span className="text-gray-500">{isDonate ? 'Buyer pays (0.5%, min £1)' : 'TrolleySave fee (1.5%)'}</span>
                 <span className="text-gray-400">{isDonate ? formatPounds(fee) : `−${formatPounds(fee)}`}</span>
               </div>
               <div className="border-t border-green-100 pt-2 flex justify-between">
@@ -187,7 +204,8 @@ export function SellModal({ open, onClose }: Props) {
 
           {/* Condition checkbox */}
           <label className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-lg p-3 cursor-pointer">
-            <input type="checkbox" checked={conditionOk} onChange={e => setConditionOk(e.target.checked)} className="accent-green-600 w-4 h-4 flex-shrink-0" />
+            <input type="checkbox" checked={conditionOk} onChange={e => setConditionOk(e.target.checked)}
+              className="accent-green-600 w-4 h-4 flex-shrink-0" />
             <span className="text-sm text-gray-700">I confirm these tins are sealed, undamaged, and in-date</span>
           </label>
 
