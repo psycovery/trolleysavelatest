@@ -22,8 +22,12 @@ export default function SellerPage() {
   const [sellOpen, setSellOpen]         = useState(false)
   const [loading, setLoading]           = useState(true)
 
+  // Nickname editing
+  const [editingNickname, setEditingNickname] = useState(false)
+  const [nicknameInput, setNicknameInput]     = useState('')
+  const [savingNickname, setSavingNickname]   = useState(false)
+
   useEffect(() => {
-    // Check for Stripe redirect params without useSearchParams
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       if (params.get('stripe') === 'success') showToast('✅ Bank account connected!')
@@ -59,6 +63,7 @@ export default function SellerPage() {
       ])
 
       setProfile(p)
+      setNicknameInput(p?.nickname ?? '')
       setListings(l ?? [])
       setOffers(o ?? [])
       setTransactions(t ?? [])
@@ -67,6 +72,28 @@ export default function SellerPage() {
     }
     load()
   }, [])
+
+  async function saveNickname() {
+    if (!nicknameInput.trim()) { showToast('⚠️ Enter a nickname'); return }
+    if (nicknameInput.trim().length < 2) { showToast('⚠️ Nickname must be at least 2 characters'); return }
+    if (nicknameInput.trim().length > 30) { showToast('⚠️ Nickname must be 30 characters or less'); return }
+
+    setSavingNickname(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase
+      .from('profiles')
+      .update({ nickname: nicknameInput.trim() })
+      .eq('id', user!.id)
+
+    if (error) {
+      showToast(`❌ ${error.message}`)
+    } else {
+      setProfile(prev => prev ? { ...prev, nickname: nicknameInput.trim() } : prev)
+      setEditingNickname(false)
+      showToast('✅ Nickname updated! This will show on your listings.')
+    }
+    setSavingNickname(false)
+  }
 
   async function handleOffer(offerId: string, action: 'accept' | 'decline') {
     const res = await fetch(`/api/offers/${offerId}`, {
@@ -90,6 +117,7 @@ export default function SellerPage() {
   const totalEarned    = transactions.filter(t => t.payout_status === 'paid').reduce((s, t) => s + t.net_payout, 0)
   const awaitingPayout = transactions.filter(t => t.payout_status === 'pending').reduce((s, t) => s + t.net_payout, 0)
   const activeListings = listings.filter(l => l.status === 'active').length
+  const displayName    = profile?.nickname || profile?.full_name?.split(' ')[0] || 'Seller'
 
   if (loading) return <div className="flex items-center justify-center min-h-screen"><Spinner size={32} /></div>
 
@@ -101,10 +129,17 @@ export default function SellerPage() {
         {/* Profile header */}
         <div className="bg-gradient-to-r from-green-800 to-green-600 rounded-[14px] p-6 text-white mb-6 flex items-center gap-5 flex-wrap">
           <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center font-display text-3xl font-bold flex-shrink-0">
-            {profile?.full_name?.charAt(0)}
+            {displayName.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-display text-xl font-bold">{profile?.full_name}</h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="font-display text-xl font-bold">{displayName}</h1>
+              {profile?.nickname && (
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full opacity-80">
+                  {profile.full_name}
+                </span>
+              )}
+            </div>
             <p className="text-sm opacity-80">{profile?.postcode} · Member since {formatDate(profile?.created_at ?? '')}</p>
             <div className="flex gap-4 mt-2 text-sm flex-wrap">
               <span>★ {profile?.rating?.toFixed(1) ?? 'New'}</span>
@@ -118,6 +153,64 @@ export default function SellerPage() {
             </div>
           </div>
           <button onClick={() => setSellOpen(true)} className="btn btn-amber">+ New listing</button>
+        </div>
+
+        {/* Nickname section */}
+        <div className="bg-white border border-gray-100 rounded-[14px] p-5 mb-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1">
+              <h2 className="font-display text-lg font-bold mb-1">Your public nickname</h2>
+              <p className="text-sm text-gray-500 mb-3">
+                This is shown on your listings instead of your real name. Keep it friendly and memorable.
+              </p>
+              {!editingNickname ? (
+                <div className="flex items-center gap-3">
+                  <div className="bg-gray-50 border border-gray-100 rounded-lg px-4 py-2.5 flex-1 max-w-xs">
+                    {profile?.nickname ? (
+                      <p className="font-semibold text-gray-900">{profile.nickname}</p>
+                    ) : (
+                      <p className="text-gray-400 italic">No nickname set — showing first name</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => { setEditingNickname(true); setNicknameInput(profile?.nickname ?? '') }}
+                    className="btn btn-outline btn-sm"
+                  >
+                    {profile?.nickname ? 'Change' : 'Add nickname'}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input
+                    value={nicknameInput}
+                    onChange={e => setNicknameInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && saveNickname()}
+                    placeholder="e.g. TinHunter99, BargainBob, SurplusSam"
+                    maxLength={30}
+                    autoFocus
+                    className="input flex-1 max-w-xs"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={saveNickname} disabled={savingNickname}
+                      className="btn btn-primary btn-sm">
+                      {savingNickname ? <Spinner size={14} className="text-white" /> : 'Save'}
+                    </button>
+                    <button onClick={() => setEditingNickname(false)} className="btn btn-outline btn-sm">
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="w-full text-xs text-gray-400">{nicknameInput.length}/30 characters</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mt-3 flex items-start gap-2 bg-green-50 border border-green-100 rounded-lg p-3">
+            <span className="flex-shrink-0 text-green-600">🔒</span>
+            <p className="text-xs text-green-700 leading-relaxed">
+              Your real name <strong>{profile?.full_name}</strong> is never shown publicly.
+              Only your nickname appears on listings, offers, and reviews.
+            </p>
+          </div>
         </div>
 
         {/* Stats */}
@@ -196,12 +289,8 @@ export default function SellerPage() {
                   <div className="flex gap-2 flex-shrink-0">
                     <a href={`/listing/${l.id}`} target="_blank"
                       className="btn btn-outline btn-sm text-xs">View</a>
-                    <button onClick={() => showToast('✏️ Edit coming soon')}
-                      className="btn btn-outline btn-sm text-xs">Edit</button>
                     {l.status === 'active' && (
                       <button onClick={async () => {
-                        const { createClient } = await import('@/lib/supabase/client')
-                        const supabase = createClient()
                         await supabase.from('listings').update({ status: 'paused' }).eq('id', l.id)
                         setListings(prev => prev.map(x => x.id === l.id ? {...x, status: 'paused' as any} : x))
                         showToast('⏸️ Listing paused')
@@ -209,8 +298,6 @@ export default function SellerPage() {
                     )}
                     {l.status === 'paused' && (
                       <button onClick={async () => {
-                        const { createClient } = await import('@/lib/supabase/client')
-                        const supabase = createClient()
                         await supabase.from('listings').update({ status: 'active' }).eq('id', l.id)
                         setListings(prev => prev.map(x => x.id === l.id ? {...x, status: 'active' as any} : x))
                         showToast('▶️ Listing reactivated')
