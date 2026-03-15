@@ -7,7 +7,8 @@ import { Spinner } from '@/components/ui'
 import { showToast } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { Camera, X } from 'lucide-react'
+import { Camera, X, AlertCircle } from 'lucide-react'
+import { CardSetupModal } from './CardSetupModal'
 
 const CATEGORIES = [
   { label: 'Beans & pulses', value: 'beans' },
@@ -41,6 +42,11 @@ export function SellModal({ open, onClose }: Props) {
   const [conditionOk, setConditionOk] = useState(false)
   const [sponsored, setSponsored]   = useState(false)
   const [loading, setLoading]       = useState(false)
+
+  // Payment / sponsorship state
+  const [paymentMethod, setPaymentMethod] = useState<any>(null)
+  const [cardModalOpen, setCardModalOpen] = useState(false)
+  const [checkingCard, setCheckingCard] = useState(false)
 
   // Image state
   const [imageFile, setImageFile]     = useState<File | null>(null)
@@ -122,6 +128,21 @@ export function SellModal({ open, onClose }: Props) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+
+      // Charge sponsorship fee if sponsored
+      if (sponsored && data.data?.id) {
+        const sponsorRes = await fetch('/api/stripe/sponsorship', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ listingId: data.data.id }),
+        })
+        const sponsorData = await sponsorRes.json()
+        if (!sponsorRes.ok) {
+          // Listing created but payment failed — unpublish it
+          await supabase.from('listings').update({ status: 'paused' }).eq('id', data.data.id)
+          throw new Error(`Sponsorship payment failed: ${sponsorData.error}. Listing saved as draft.`)
+        }
+      }
 
       // Upload image if selected
       if (imageFile && data.data?.id) {
@@ -356,7 +377,7 @@ export function SellModal({ open, onClose }: Props) {
           {/* Sponsorship (sell mode only) */}
           {!isDonate && (
             <div className={cn('border rounded-lg overflow-hidden transition-colors', sponsored ? 'border-amber-200' : 'border-gray-100')}>
-              <label className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => setSponsored(!sponsored)}>
+              <label className="flex items-center gap-3 p-3 cursor-pointer" onClick={handleSponsorToggle}>
                 <input type="checkbox" checked={sponsored} onChange={() => {}} className="accent-amber-400 w-4 h-4 flex-shrink-0" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-0.5">
@@ -371,6 +392,18 @@ export function SellModal({ open, onClose }: Props) {
                 <div className="px-3 pb-3 bg-amber-50 border-t border-amber-100 pt-2 text-xs text-amber-700 space-y-1">
                   <p>⚡ Pinned to top of search for 7 days</p>
                   <p>🏷️ Bold Sponsored badge on your listing</p>
+                  {paymentMethod ? (
+                    <div className="flex items-center justify-between mt-1 bg-white/60 rounded p-2">
+                      <span>💳 {paymentMethod.brand?.toUpperCase()} ending {paymentMethod.last4}</span>
+                      <button onClick={e => { e.preventDefault(); setCardModalOpen(true) }}
+                        className="text-amber-600 underline text-[10px]">Change</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-red-600 mt-1">
+                      <AlertCircle className="w-3 h-3" />
+                      <span>No card saved — add one to sponsor</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -386,6 +419,17 @@ export function SellModal({ open, onClose }: Props) {
           </button>
         </div>
       </div>
+    </div>
+
+      {/* Card setup modal */}
+      <CardSetupModal
+        open={cardModalOpen}
+        onClose={() => setCardModalOpen(false)}
+        onSuccess={() => {
+          setCardModalOpen(false)
+          checkPaymentMethod().then(() => setSponsored(true))
+        }}
+      />
     </div>
   )
 }
