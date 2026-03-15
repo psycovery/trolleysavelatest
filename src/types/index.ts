@@ -32,6 +32,7 @@ export type Listing = {
   delivery_method: DeliveryMethod
   postcode: string
   status: ListingStatus
+  is_bundle: boolean
   is_sponsored: boolean
   sponsored_until: string | null
   image_url: string | null
@@ -134,6 +135,17 @@ export type BasketItem = {
   listing_id: string
   listing: Listing
   quantity: number
+}
+
+export type BundleItem = {
+  id: string
+  listing_id: string
+  title: string
+  brand: string | null
+  quantity: number
+  weight_grams: number | null
+  best_before: string | null
+  created_at: string
 }
 
 // API response shapes

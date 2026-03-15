@@ -2,7 +2,7 @@
 // src/components/listings/ListingCard.tsx
 import Link from 'next/link'
 import Image from 'next/image'
-import { Heart, Clock } from 'lucide-react'
+import { Heart, Clock, Package } from 'lucide-react'
 import { Listing } from '@/types'
 import { formatPounds, calcSaving, formatBestBefore, isExpiringSoon, timeRemaining, expiryUrgency } from '@/lib/utils'
 import { Badge, StarRating, TinPlaceholder } from '@/components/ui'
@@ -51,8 +51,12 @@ export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false
             />
           )}
 
+          {/* Bundle badge */}
+          {(listing as any).is_bundle && (
+            <span className="absolute top-2 left-2"><Badge variant="amber">📦 Bundle</Badge></span>
+          )}
           {/* Badge top-left */}
-          {isDonation && (
+          {isDonation && !((listing as any).is_bundle) && (
             <span className="absolute top-2 left-2"><Badge variant="donate">🆓 Free</Badge></span>
           )}
           {isSponsored && !isDonation && (
@@ -91,6 +95,12 @@ export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false
         <div className="p-3">
           <p className="font-semibold text-sm text-gray-900 truncate mb-1">{listing.title}</p>
 
+          {(listing as any).is_bundle && (listing as any).bundle_item_count && (
+            <p className="text-xs font-semibold text-amber-600 mb-1 flex items-center gap-1">
+              <Package className="w-3 h-3" />
+              {(listing as any).bundle_item_count} different tins · Cannot split
+            </p>
+          )}
           {isDonation && (
             <p className="text-xs font-semibold text-green-700 mb-1">
               Listed value: {formatPounds(listing.asking_price ?? 0)} · Claim fee: £1.00
