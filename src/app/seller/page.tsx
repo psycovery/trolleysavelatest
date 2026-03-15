@@ -193,6 +193,30 @@ export default function SellerPage() {
                     {l.status.charAt(0).toUpperCase() + l.status.slice(1)}
                   </Badge>
                   {l.is_sponsored && <Badge variant="amber">⚡ Sponsored</Badge>}
+                  <div className="flex gap-2 flex-shrink-0">
+                    <a href={`/listing/${l.id}`} target="_blank"
+                      className="btn btn-outline btn-sm text-xs">View</a>
+                    <button onClick={() => showToast('✏️ Edit coming soon')}
+                      className="btn btn-outline btn-sm text-xs">Edit</button>
+                    {l.status === 'active' && (
+                      <button onClick={async () => {
+                        const { createClient } = await import('@/lib/supabase/client')
+                        const supabase = createClient()
+                        await supabase.from('listings').update({ status: 'paused' }).eq('id', l.id)
+                        setListings(prev => prev.map(x => x.id === l.id ? {...x, status: 'paused' as any} : x))
+                        showToast('⏸️ Listing paused')
+                      }} className="btn btn-sm bg-gray-100 text-gray-600 text-xs border-none">Pause</button>
+                    )}
+                    {l.status === 'paused' && (
+                      <button onClick={async () => {
+                        const { createClient } = await import('@/lib/supabase/client')
+                        const supabase = createClient()
+                        await supabase.from('listings').update({ status: 'active' }).eq('id', l.id)
+                        setListings(prev => prev.map(x => x.id === l.id ? {...x, status: 'active' as any} : x))
+                        showToast('▶️ Listing reactivated')
+                      }} className="btn btn-sm bg-green-50 text-green-700 text-xs border-none">Activate</button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -255,7 +279,7 @@ export default function SellerPage() {
 
       </main>
       <Footer />
-      <SellModal open={sellOpen} onClose={() => setSellOpen(false)} />
+      <SellModal open={sellOpen} onClose={(created?: boolean) => { setSellOpen(false); if (created) window.location.reload() }} />
       <Toast />
     </>
   )
