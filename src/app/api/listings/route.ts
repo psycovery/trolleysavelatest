@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
 // POST /api/listings — create a new listing
 export async function POST(request: Request) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
