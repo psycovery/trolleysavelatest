@@ -98,7 +98,7 @@ export default function ListingDetailPage() {
           <div>
             <div className={`relative h-72 rounded-[14px] overflow-hidden mb-4 flex items-center justify-center border border-gray-100 ${listing.is_donation ? 'bg-[#E8F8F0]' : 'bg-gray-50'}`}>
               {listing.image_url ? (
-                <Image src={listing.image_url} alt={listing.title} fill className="object-cover" />
+                <Image src={listing.image_url} alt={listing.title} fill className="object-contain p-3" />
               ) : (
                 <TinPlaceholder
                   label={listing.title}

@@ -42,7 +42,7 @@ export function ListingCard({ listing, onOffer, onClaim, onSave, isSaved = false
           isDonation ? 'bg-[#E8F8F0]' : isSponsored ? 'bg-amber-50' : 'bg-gray-50'
         )}>
           {listing.image_url ? (
-            <Image src={listing.image_url} alt={listing.title} fill className="object-cover" />
+            <Image src={listing.image_url} alt={listing.title} fill className="object-contain p-2" />
           ) : (
             <TinPlaceholder
               label={listing.title}
