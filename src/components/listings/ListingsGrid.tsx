@@ -58,7 +58,7 @@ export function ListingsGrid({ onOffer, onClaim }: Props) {
 
     let query = supabase
       .from('listings')
-      .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,rating,sales_count,postcode)')
+      .select('*, seller:profiles!listings_seller_id_fkey(id,full_name,nickname,rating,sales_count,postcode)')
       .eq('status', 'active')
       .order(sortField, { ascending: sortDir === 'asc' })
       .limit(48)
