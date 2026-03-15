@@ -75,4 +75,59 @@ export type WishlistItem = {
   product_name: string
   match_type: MatchType
   location_radius: number
-  created_at:
+  created_at: string
+}
+
+export type WishlistMatch = {
+  id: string
+  wishlist_id: string
+  listing_id: string
+  buyer_id: string
+  notified_at: string
+  seen: boolean
+  listing?: Listing
+  wishlist?: WishlistItem
+}
+
+export type Review = {
+  id: string
+  seller_id: string
+  buyer_id: string
+  listing_id: string
+  rating: number
+  review_text: string | null
+  created_at: string
+  buyer?: Profile
+  listing?: Listing
+}
+
+export type PayoutStatus = 'pending' | 'paid' | 'failed'
+
+export type Transaction = {
+  id: string
+  offer_id: string | null
+  donation_claim_id: string | null
+  seller_id: string | null
+  buyer_id: string
+  gross_amount: number
+  platform_fee: number
+  net_payout: number
+  stripe_transfer_id: string | null
+  payout_status: PayoutStatus
+  created_at: string
+  seller?: Profile
+  buyer?: Profile
+}
+
+export type BasketItem = {
+  id: string
+  listing_id: string
+  listing: Listing
+  quantity: number
+}
+
+export type ApiSuccess<T> = { data: T; error: null }
+export type ApiError     = { data: null; error: string }
+export type ApiResponse<T> = ApiSuccess<T> | ApiError
+
+export type StripeConnectStatus = 'not_started' | 'pending' | 'verified' | 'failed'
