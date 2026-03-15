@@ -1,5 +1,4 @@
 'use client'
-export const dynamic = 'force-dynamic'
 // src/app/page.tsx
 import { useState } from 'react'
 import { Header } from '@/components/layout/Header'

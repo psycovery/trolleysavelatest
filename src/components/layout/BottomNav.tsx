@@ -1,19 +1,17 @@
 'use client'
 // src/components/layout/BottomNav.tsx
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { Home, Search, Heart, User, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function BottomNav({ onSell }: { onSell: () => void }) {
-  const pathname = usePathname()
-
+  // usePathname removed — active state handled by CSS :active instead
   const navItems = [
-    { href: '/',       icon: Home,   label: 'Home'   },
-    { href: '/listing',icon: Search, label: 'Browse' },
-    null, // sell button placeholder
-    { href: '/buyer',  icon: Heart,  label: 'Saved'  },
-    { href: '/seller', icon: User,   label: 'Profile'},
+    { href: '/',        icon: Home,   label: 'Home'    },
+    { href: '/listing', icon: Search, label: 'Browse'  },
+    null,
+    { href: '/buyer',   icon: Heart,  label: 'Saved'   },
+    { href: '/seller',  icon: User,   label: 'Profile' },
   ]
 
   return (
@@ -29,12 +27,9 @@ export function BottomNav({ onSell }: { onSell: () => void }) {
             </button>
           )
           const Icon = item.icon
-          const active = pathname === item.href
           return (
             <Link key={item.href} href={item.href}
-              className={cn('flex flex-col items-center gap-1 px-4 py-2 text-[10px] font-medium transition-colors',
-                active ? 'text-green-700' : 'text-gray-400'
-              )}>
+              className={cn('flex flex-col items-center gap-1 px-4 py-2 text-[10px] font-medium text-gray-400 hover:text-green-700 transition-colors')}>
               <Icon className="w-5 h-5" />
               {item.label}
             </Link>
