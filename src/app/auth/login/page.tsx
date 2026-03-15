@@ -1,262 +1,116 @@
 'use client'
-// src/app/seller/page.tsx
-import { useEffect, useState } from 'react'
+// src/app/auth/login/page.tsx
+import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Header } from '@/components/layout/Header'
-import { Footer } from '@/components/layout/Footer'
-import { SellModal } from '@/components/modals/SellModal'
-import { Toast, showToast, Spinner, StarRating, Badge, SectionHeader } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
-import { formatPounds, formatDate } from '@/lib/utils'
-import type { Profile, Listing, Offer, Transaction, Review } from '@/types'
+import { Logo } from '@/components/ui/Logo'
+import { Spinner } from '@/components/ui'
 
-export default function SellerPage() {
-  const supabase = createClient()
+export default function LoginPage() {
   const router = useRouter()
+  const supabase = createClient()
 
-  const [profile, setProfile]           = useState<Profile | null>(null)
-  const [listings, setListings]         = useState<Listing[]>([])
-  const [offers, setOffers]             = useState<Offer[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [reviews, setReviews]           = useState<Review[]>([])
-  const [sellOpen, setSellOpen]         = useState(false)
-  const [loading, setLoading]           = useState(true)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  useEffect(() => {
-    // Check for Stripe redirect params without useSearchParams
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      if (params.get('stripe') === 'success') showToast('✅ Bank account connected!')
-      if (params.get('stripe') === 'refresh')  showToast('⚠️ Please complete bank account setup')
-    }
-  }, [])
-
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/auth/login?redirectTo=/seller'); return }
-
-      const listingIds = (await supabase.from('listings').select('id').eq('seller_id', user.id)).data?.map(l => l.id) ?? []
-
-      const [{ data: p }, { data: l }, { data: o }, { data: t }, { data: r }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('listings').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('offers')
-          .select('*, listing:listings(title,asking_price), buyer:profiles(full_name,postcode)')
-          .in('listing_id', listingIds.length > 0 ? listingIds : ['none'])
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false }),
-        supabase.from('transactions')
-          .select('*, buyer:profiles(full_name)')
-          .eq('seller_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase.from('reviews')
-          .select('*, buyer:profiles(full_name), listing:listings(title)')
-          .eq('seller_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10),
-      ])
-
-      setProfile(p)
-      setListings(l ?? [])
-      setOffers(o ?? [])
-      setTransactions(t ?? [])
-      setReviews(r ?? [])
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setError(error.message)
       setLoading(false)
+      return
     }
-    load()
-  }, [])
+    router.push('/')
+  }
 
-  async function handleOffer(offerId: string, action: 'accept' | 'decline') {
-    const res = await fetch(`/api/offers/${offerId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
+  async function handleGoogle() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
-    const data = await res.json()
-    if (!res.ok) { showToast(`❌ ${data.error}`); return }
-    showToast(action === 'accept' ? '✅ Offer accepted!' : '❌ Offer declined')
-    setOffers(prev => prev.filter(o => o.id !== offerId))
   }
 
-  async function connectStripe() {
-    const res = await fetch('/api/stripe/connect', { method: 'POST' })
-    const { url, error } = await res.json()
-    if (error) { showToast(`❌ ${error}`); return }
-    window.location.href = url
+  async function handleApple() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    })
   }
-
-  const totalEarned    = transactions.filter(t => t.payout_status === 'paid').reduce((s, t) => s + t.net_payout, 0)
-  const awaitingPayout = transactions.filter(t => t.payout_status === 'pending').reduce((s, t) => s + t.net_payout, 0)
-  const activeListings = listings.filter(l => l.status === 'active').length
-
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><Spinner size={32} /></div>
 
   return (
-    <>
-      <Header />
-      <main className="max-w-5xl mx-auto px-4 py-6 pb-24">
-
-        {/* Profile header */}
-        <div className="bg-gradient-to-r from-green-800 to-green-600 rounded-[14px] p-6 text-white mb-6 flex items-center gap-5 flex-wrap">
-          <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center font-display text-3xl font-bold flex-shrink-0">
-            {profile?.full_name?.charAt(0)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="font-display text-xl font-bold">{profile?.full_name}</h1>
-            <p className="text-sm opacity-80">{profile?.postcode} · Member since {formatDate(profile?.created_at ?? '')}</p>
-            <div className="flex gap-4 mt-2 text-sm flex-wrap">
-              <span>★ {profile?.rating?.toFixed(1) ?? 'New'}</span>
-              <span>{profile?.sales_count} sales</span>
-              {!profile?.stripe_verified && (
-                <button onClick={connectStripe}
-                  className="bg-amber-400 text-amber-700 px-3 py-0.5 rounded-full text-xs font-bold">
-                  ⚠️ Set up payouts
-                </button>
-              )}
-            </div>
-          </div>
-          <button onClick={() => setSellOpen(true)} className="btn btn-amber">+ New listing</button>
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <Link href="/"><Logo size="lg" /></Link>
+          <p className="text-xs tracking-widest uppercase text-gray-400 mt-1">Food Exchange · UK</p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          {[
-            { label: 'Total earned',    value: formatPounds(totalEarned),    color: 'text-green-700' },
-            { label: 'Active listings', value: activeListings,               color: 'text-amber-500' },
-            { label: 'Pending offers',  value: offers.length,                color: 'text-green-700' },
-            { label: 'Awaiting payout', value: formatPounds(awaitingPayout), color: 'text-green-700' },
-          ].map(s => (
-            <div key={s.label} className="bg-white border border-gray-100 rounded-[14px] p-4 text-center">
-              <p className={`font-display text-3xl font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-gray-400 mt-1">{s.label}</p>
+        <div className="bg-white border border-gray-100 rounded-[14px] p-6">
+          <div className="space-y-2 mb-5">
+            <button onClick={handleGoogle}
+              className="w-full flex items-center justify-center gap-3 py-2.5 border border-gray-100 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Continue with Google
+            </button>
+            <button onClick={handleApple}
+              className="w-full flex items-center justify-center gap-3 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-black transition-colors">
+              🍎 Continue with Apple
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 h-px bg-gray-100" />
+            <span className="text-xs text-gray-400">or</span>
+            <div className="flex-1 h-px bg-gray-100" />
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-3">
+            {error && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{error}</p>
+            )}
+            <div>
+              <label className="label">Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.co.uk" className="input" required />
             </div>
-          ))}
+            <div>
+              <label className="label">Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••" className="input" required />
+            </div>
+            <div className="text-right">
+              <Link href="/auth/forgot" className="text-xs text-green-700 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+            <button type="submit" disabled={loading}
+              className="btn btn-primary w-full justify-center py-3 rounded-lg text-base">
+              {loading ? <Spinner size={18} className="text-white" /> : 'Log in'}
+            </button>
+          </form>
         </div>
 
-        {/* Pending offers */}
-        {offers.length > 0 && (
-          <div className="mb-8">
-            <SectionHeader title="Pending offers" />
-            <div className="space-y-3">
-              {offers.map(offer => (
-                <div key={offer.id} className="bg-white border border-amber-200 rounded-[14px] p-4 flex items-center gap-4 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm">{(offer.listing as any)?.title}</p>
-                    <p className="text-xs text-gray-400">
-                      From {(offer.buyer as any)?.full_name} · {formatDate(offer.created_at)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-display text-xl font-bold text-amber-500">{formatPounds(offer.amount)}</p>
-                    <p className="text-xs text-gray-400">asking {formatPounds((offer.listing as any)?.asking_price ?? 0)}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleOffer(offer.id, 'accept')} className="btn btn-primary btn-sm">Accept</button>
-                    <button onClick={() => handleOffer(offer.id, 'decline')} className="btn btn-outline btn-sm">Decline</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* My listings */}
-        <div className="mb-8">
-          <SectionHeader title="My listings" action={
-            <button onClick={() => setSellOpen(true)} className="btn btn-primary btn-sm">+ New</button>
-          } />
-          {listings.length === 0 ? (
-            <div className="text-center py-12 bg-white border border-gray-100 rounded-[14px]">
-              <p className="text-3xl mb-2">📦</p>
-              <p className="font-semibold text-gray-700">No listings yet</p>
-              <p className="text-sm text-gray-400 mt-1 mb-4">List your first tin for free</p>
-              <button onClick={() => setSellOpen(true)} className="btn btn-primary">+ List a tin</button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {listings.map(l => (
-                <div key={l.id} className="bg-white border border-gray-100 rounded-[14px] p-4 flex items-center gap-4 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{l.title}</p>
-                    <p className="text-xs text-gray-400">
-                      {(l as any).view_count ?? 0} views · {formatDate(l.created_at)}
-                    </p>
-                  </div>
-                  {l.is_donation ? (
-                    <Badge variant="donate">🆓 Free</Badge>
-                  ) : (
-                    <span className="font-display font-bold text-green-700">{formatPounds(l.asking_price!)}</span>
-                  )}
-                  <Badge variant={l.status === 'active' ? 'green' : l.status === 'sold' ? 'gray' : 'amber'}>
-                    {l.status.charAt(0).toUpperCase() + l.status.slice(1)}
-                  </Badge>
-                  {l.is_sponsored && <Badge variant="amber">⚡ Sponsored</Badge>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Reviews */}
-        {reviews.length > 0 && (
-          <div className="mb-8">
-            <SectionHeader
-              title="Reviews"
-              subtitle={`${profile?.rating?.toFixed(1) ?? 0} average · ${reviews.length} reviews`}
-            />
-            <div className="bg-white border border-gray-100 rounded-[14px] overflow-hidden">
-              {reviews.map((r, i) => (
-                <div key={r.id} className={`p-4 flex gap-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
-                  <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                    {(r.buyer as any)?.full_name?.charAt(0)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <div>
-                        <span className="font-semibold text-sm">{(r.buyer as any)?.full_name}</span>
-                        <span className="text-xs text-gray-400 ml-2">{formatDate(r.created_at)}</span>
-                      </div>
-                      <StarRating rating={r.rating} />
-                    </div>
-                    {r.review_text && (
-                      <p className="text-sm text-gray-500 leading-relaxed">{r.review_text}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Payout history */}
-        {transactions.length > 0 && (
-          <div className="mb-8">
-            <SectionHeader title="Payout history" />
-            <div className="bg-white border border-gray-100 rounded-[14px] overflow-hidden">
-              {transactions.map((t, i) => (
-                <div key={t.id} className={`px-4 py-3 flex justify-between items-center ${i > 0 ? 'border-t border-gray-100' : ''}`}>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">{formatDate(t.created_at)}</p>
-                    <p className="text-xs text-gray-400">Fee: {formatPounds(t.platform_fee)} (1.5%)</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-display font-bold text-green-700">{formatPounds(t.net_payout)}</p>
-                    <Badge variant={t.payout_status === 'paid' ? 'green' : t.payout_status === 'failed' ? 'red' : 'amber'}>
-                      {t.payout_status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-      </main>
-      <Footer />
-      <SellModal open={sellOpen} onClose={() => setSellOpen(false)} />
-      <Toast />
-    </>
+        <p className="text-center text-sm text-gray-500 mt-4">
+          No account?{' '}
+          <Link href="/auth/register" className="text-green-700 font-medium hover:underline">
+            Register free
+          </Link>
+        </p>
+        <p className="text-center text-xs text-gray-400 mt-3">
+          SSL encrypted · ICO registered · UK GDPR compliant
+        </p>
+      </div>
+    </div>
   )
 }
